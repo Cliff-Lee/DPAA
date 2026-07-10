@@ -150,6 +150,19 @@
     const syllabusId = params.get("syllabus");
     const level = params.get("level");
 
+    if (params.get("demo") === "1") {
+      const nicknameKey = "AA_PUBLIC_DEMO_NICKNAME";
+      let nickname = sessionStorage.getItem(nicknameKey);
+      if (!nickname) {
+        nickname = `Guest-${Math.floor(1000 + Math.random() * 9000)}`;
+        sessionStorage.setItem(nicknameKey, nickname);
+      }
+      AA_UI.byId("classCode").value = "PUBLIC-DEMO";
+      AA_UI.byId("classCode").readOnly = true;
+      AA_UI.byId("nickname").value = nickname;
+      AA_UI.byId("publicDemoPracticeNotice")?.classList.remove("hidden");
+    }
+
     if (["SL", "HL"].includes(level)) {
       AA_UI.byId("courseLevel").value = level;
     }

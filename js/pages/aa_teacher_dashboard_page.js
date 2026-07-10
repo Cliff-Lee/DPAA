@@ -20,6 +20,9 @@
     bindEvents();
     bindStorageEvents();
     configureStorageMode();
+    if (new URLSearchParams(window.location.search).get("demo") === "1") {
+      signInPublicDemo();
+    }
   }
 
   function bindEvents() {
@@ -35,7 +38,10 @@
     AA_UI.byId("exportCsvButton").addEventListener("click", exportCSV);
     AA_UI.byId("resetDashboardButton").addEventListener("click", resetData);
     AA_UI.byId("teacherLoginForm")?.addEventListener("submit", signInTeacher);
+    AA_UI.byId("tryPublicDemoButton")?.addEventListener("click", signInPublicDemo);
     AA_UI.byId("teacherSignOutButton")?.addEventListener("click", signOutTeacher);
+    AA_UI.byId("refreshPublicDemoButton")?.addEventListener("click", refreshPublicDemo);
+    AA_UI.byId("switchToPremiumButton")?.addEventListener("click", switchToPremiumAccount);
     AA_UI.byId("openCreateClassButton")?.addEventListener("click", showCreateClassPanel);
     AA_UI.byId("cancelCreateClassButton")?.addEventListener("click", hideCreateClassPanel);
     AA_UI.byId("createClassForm")?.addEventListener("submit", createTeacherClass);
@@ -75,6 +81,14 @@
     status.classList.toggle("auth-error", Boolean(isError));
   }
 
+  function setPublicDemoUI(isPublicDemo) {
+    AA_UI.byId("publicDemoBanner")?.classList.toggle("hidden", !isPublicDemo);
+    document.querySelectorAll(".premium-only").forEach((element) => {
+      element.classList.toggle("hidden", isPublicDemo);
+    });
+    if (isPublicDemo) hideCreateClassPanel();
+  }
+
   function configureStorageMode() {
     const authPanel = AA_UI.byId("teacherAuthPanel");
     const loginForm = AA_UI.byId("teacherLoginForm");
@@ -82,11 +96,15 @@
     const signOutButton = AA_UI.byId("teacherSignOutButton");
     const signedInActions = AA_UI.byId("teacherSignedInActions");
     const resetButton = AA_UI.byId("resetDashboardButton");
+    const demoEntry = AA_UI.byId("publicDemoEntry");
+    const tryDemoButton = AA_UI.byId("tryPublicDemoButton");
 
     if (!isFirebaseMode()) {
       authPanel?.classList.add("hidden");
       loginForm?.classList.add("hidden");
       signedInActions?.classList.add("hidden");
+      demoEntry?.classList.add("hidden");
+      setPublicDemoUI(false);
       setDashboardContentVisible(true);
       if (resetButton) resetButton.textContent = "Reset local data";
       loadTeacherClassesAndRefresh({ force: true });
@@ -94,11 +112,14 @@
     }
 
     authPanel?.classList.remove("hidden");
+    demoEntry?.classList.remove("hidden");
+    setPublicDemoUI(false);
     if (resetButton) resetButton.textContent = "Reset Firebase attempts";
 
     if (!AAStorage.hasConfig?.()) {
       setDashboardContentVisible(false);
       if (signInButton) signInButton.disabled = true;
+      if (tryDemoButton) tryDemoButton.disabled = true;
       loginForm?.classList.remove("hidden");
       signOutButton?.classList.add("hidden");
       signedInActions?.classList.add("hidden");
@@ -108,8 +129,9 @@
     }
 
     if (signInButton) signInButton.disabled = false;
+    if (tryDemoButton) tryDemoButton.disabled = false;
     const user = AAStorage.getAuthUser?.();
-    if (!user || user.isAnonymous) {
+    if (!user || (user.isAnonymous && !user.isPublicDemo)) {
       setDashboardContentVisible(false);
       loginForm?.classList.remove("hidden");
       signOutButton?.classList.add("hidden");
@@ -119,13 +141,18 @@
     }
 
     loginForm?.classList.add("hidden");
+    demoEntry?.classList.add("hidden");
     signOutButton?.classList.remove("hidden");
     signedInActions?.classList.remove("hidden");
-    setAuthStatus(`Signed in as ${user.email || "teacher"}. Loading class data...`);
+    setPublicDemoUI(Boolean(user.isPublicDemo));
+    const accountLabel = user.isPublicDemo ? "the shared public demo" : (user.email || "teacher");
+    setAuthStatus(`Signed in as ${accountLabel}. Loading class data...`);
     setDashboardContentVisible(true);
     loadTeacherClassesAndRefresh({ user })
       .then(() => {
-        setAuthStatus(`Signed in as ${user.email || "teacher"}.`);
+        setAuthStatus(user.isPublicDemo
+          ? "Viewing today’s shared public demo. Activity is visible to everyone and clears nightly."
+          : `Signed in as ${user.email || "teacher"}.`);
       })
       .catch((error) => {
         setDashboardContentVisible(false);
@@ -153,6 +180,39 @@
       setAuthStatus(error.message || "Teacher sign-in failed.", true);
     } finally {
       if (signInButton) signInButton.disabled = false;
+    }
+  }
+
+  async function signInPublicDemo() {
+    if (!AAStorage.signInPublicDemo) return;
+    const button = AA_UI.byId("tryPublicDemoButton");
+    if (button) button.disabled = true;
+    setAuthStatus("Opening the live public demo...");
+    try {
+      await AAStorage.signInPublicDemo();
+    } catch (error) {
+      setAuthStatus(error.message || "The public demo could not be opened.", true);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function switchToPremiumAccount() {
+    await signOutTeacher();
+    AA_UI.byId("teacherEmail")?.focus();
+  }
+
+  async function refreshPublicDemo() {
+    const button = AA_UI.byId("refreshPublicDemoButton");
+    if (button) button.disabled = true;
+    setAuthStatus("Refreshing today’s public activity...");
+    try {
+      await loadTeacherClassesAndRefresh({ force: true });
+      setAuthStatus("Public demo activity refreshed.");
+    } catch (error) {
+      setAuthStatus(error.message || "The public demo could not be refreshed.", true);
+    } finally {
+      if (button) button.disabled = false;
     }
   }
 
