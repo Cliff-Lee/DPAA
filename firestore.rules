@@ -58,7 +58,7 @@ service cloud.firestore {
             'isPublicDemo',
             'createdAt'
           ])
-          && request.resource.data.name == 'Today’s public demo'
+          && request.resource.data.name == "Today's public demo"
           && request.resource.data.teacherUid == 'PUBLIC-DEMO'
           && request.resource.data.isPublicDemo == true
           && request.resource.data.createdAt == request.time);
