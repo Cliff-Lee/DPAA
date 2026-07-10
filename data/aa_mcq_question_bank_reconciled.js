@@ -25,8 +25,8 @@
       t("Evaluate \\(\\displaystyle\\sum_{k=1}^{5}3(2)^{k-1}\\).", "This is a geometric sum with \\(a=3\\), \\(r=2\\), \\(n=5\\). \\(S_5=3\\frac{2^5-1}{2-1}=93\\).", "Award marks for recognizing a geometric series and evaluating it.")
     ],
     "AA-SL-1.4": [
-      t("An investment of \\(2500\\) dollars earns compound interest at \\(4.2\\%\\) per year. Find its value after 6 years.", "\\(V=2500(1.042)^6\\approx3199.29\\).", "Award marks for compound growth multiplier and substitution."),
-      t("A laptop worth \\(1200\\) dollars depreciates by \\(18\\%\\) each year. Find its value after 4 years.", "\\(V=1200(0.82)^4\\approx542.69\\).", "Award marks for using a depreciation multiplier and evaluating.")
+      t("An investment of \\(2500\\) dollars earns compound interest at \\(4.2\\%\\) per year. Find its value after 6 years.", "\\(V=2500(1.042)^6\\approx3199.97\\).", "Award marks for compound growth multiplier and substitution."),
+      t("A laptop worth \\(1200\\) dollars depreciates by \\(18\\%\\) each year. Find its value after 4 years.", "\\(V=1200(0.82)^4\\approx542.55\\).", "Award marks for using a depreciation multiplier and evaluating.")
     ],
     "AA-SL-1.5": [
       t("Simplify \\(\\left(2^3\\times2^{-5}\\right)^2\\).", "\\(2^3\\times2^{-5}=2^{-2}\\), so the expression is \\((2^{-2})^2=2^{-4}=\\frac1{16}\\).", "Award marks for exponent laws and final simplification."),
@@ -145,7 +145,7 @@
       t("A right cone has radius \\(3\\) cm and height \\(8\\) cm. Find its volume.", "\\(V=\\frac13\\pi r^2h=\\frac13\\pi(9)(8)=24\\pi\\).", "Award marks for cone volume formula.")
     ],
     "AA-SL-3.2": [
-      t("In triangle \\(ABC\\), \\(AB=7\\), \\(AC=11\\), and \\(\\angle BAC=52^\\circ\\). Find \\(BC\\).", "\\(BC^2=7^2+11^2-2(7)(11)\\cos52^\\circ\\), so \\(BC\\approx8.68\\).", "Award marks for cosine rule and calculation."),
+      t("In triangle \\(ABC\\), \\(AB=7\\), \\(AC=11\\), and \\(\\angle BAC=52^\\circ\\). Find \\(BC\\).", "\\(BC^2=7^2+11^2-2(7)(11)\\cos52^\\circ\\), so \\(BC\\approx8.67\\).", "Award marks for cosine rule and calculation."),
       t("Find the area of a triangle with sides \\(8\\) and \\(10\\) enclosing an angle of \\(35^\\circ\\).", "\\(A=\\frac12(8)(10)\\sin35^\\circ\\approx22.9\\).", "Award marks for triangle area formula.")
     ],
     "AA-SL-3.3": [
@@ -329,7 +329,7 @@
       t("Evaluate \\(\\displaystyle\\int \\sec^2(3x)\\,dx\\).", "\\(\\int\\sec^2(3x)dx=\\frac13\\tan(3x)+C\\).", "Award marks for advanced trig integral.")
     ],
     "AA-AHL-5.16": [
-      t("Evaluate \\(\\displaystyle\\int 2x\\cos(x^2)\\,dx\\).", "Let \\(u=x^2\\). Then \\(du=2x\\,dx\\), so the integral is \\(\\sin(x^2)+C\\).", "Award marks for substitution."),
+      t("Evaluate \\(\\displaystyle\\int 3x^2e^{x^3}\\,dx\\).", "Let \\(u=x^3\\). Then \\(du=3x^2\\,dx\\), so the integral is \\(e^{x^3}+C\\).", "Award marks for a complete substitution and the constant of integration."),
       t("Evaluate \\(\\displaystyle\\int xe^x\\,dx\\).", "Using integration by parts with \\(u=x\\), \\(dv=e^x dx\\), the integral is \\(xe^x-e^x+C=e^x(x-1)+C\\).", "Award marks for integration by parts.")
     ],
     "AA-AHL-5.17": [
@@ -346,14 +346,18 @@
     ]
   };
 
+  let flattenedSyllabusCache = null;
   function flattenSyllabus() {
-    return (window.AA_SYLLABUS || []).flatMap((topic) =>
-      topic.syllabusPoints.map((point) => ({
-        ...point,
-        topicId: topic.topicId,
-        topicName: topic.topicName
-      }))
-    );
+    if (!flattenedSyllabusCache) {
+      flattenedSyllabusCache = (window.AA_SYLLABUS || []).flatMap((topic) =>
+        topic.syllabusPoints.map((point) => ({
+          ...point,
+          topicId: topic.topicId,
+          topicName: topic.topicName
+        }))
+      );
+    }
+    return flattenedSyllabusCache;
   }
 
   function choiceFromString(value, forceLatex = false) {
@@ -379,83 +383,117 @@
     });
   }
 
+  function hashText(value) {
+    let hash = 2166136261;
+    for (const character of String(value || "")) {
+      hash ^= character.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function greatestCommonDivisor(a, b) {
+    let left = Math.abs(a);
+    let right = Math.abs(b);
+    while (right) [left, right] = [right, left % right];
+    return left;
+  }
+
+  function selectDistractors(distractors, seed, count) {
+    const candidates = unique(distractors);
+    if (candidates.length <= count) return candidates;
+    const start = hashText(seed + ":start") % candidates.length;
+    let step = (hashText(seed + ":step") % (candidates.length - 1)) + 1;
+    while (greatestCommonDivisor(step, candidates.length) !== 1) {
+      step = (step % (candidates.length - 1)) + 1;
+    }
+    return Array.from({ length: count }, (_, index) =>
+      candidates[(start + index * step) % candidates.length]);
+  }
+
   function makeChoices(correct, distractors, seed, forceLatex = false) {
-    const options = unique([correct, ...distractors]).slice(0, 4);
+    const orderedDistractors = selectDistractors(distractors, seed, 3);
+    const options = unique([correct, ...orderedDistractors]).slice(0, 4);
     const fallbacks = [
       "This option uses a method from a different syllabus point.",
       "This option ignores a required condition or restriction.",
       "This option gives a plausible but unsupported conclusion."
     ];
     while (options.length < 4) options.push(fallbacks[options.length - 1] || "This option is not supported by the question.");
-    const ordered = rotate(options, seed);
+    const ordered = rotate(options, hashText(seed));
     return {
       choices: ordered.map((option) => choiceFromString(option, forceLatex)),
       correctIndex: ordered.indexOf(correct)
     };
   }
 
-  function allResultDistractors(point, task) {
-    const sameTopicIds = flattenSyllabus()
-      .filter((candidate) => candidate.topicId === point.topicId && candidate.id !== point.id)
-      .map((candidate) => candidate.id);
-    const sourceIds = sameTopicIds.length ? sameTopicIds : Object.keys(verifiedTasks).filter((id) => id !== point.id);
-    return unique(sourceIds.flatMap((id) =>
-      (verifiedTasks[id] || []).map((taskItem) => taskItem.workedSolutionLatex)
-    ))
-      .filter((value) => value !== task.workedSolutionLatex);
+  function questionSeed(point, index, salt = "") {
+    return point.id + ":" + index + ":" + salt;
   }
 
-  function descriptionDistractors(point) {
-    const points = flattenSyllabus();
-    return unique([
-      ...points.filter((candidate) => candidate.topicId === point.topicId && candidate.id !== point.id).map((candidate) => candidate.description),
-      ...points.filter((candidate) => candidate.topicId !== point.topicId).map((candidate) => candidate.description)
-    ]);
+  function lowerFirst(value) {
+    const text = String(value || "").trim();
+    return text ? text.charAt(0).toLowerCase() + text.slice(1) : text;
   }
 
-  function skillDistractors(point) {
-    return unique(flattenSyllabus()
-      .filter((candidate) => candidate.id !== point.id)
-      .flatMap((candidate) => candidate.skills || []));
+  function methodForTask(task) {
+    const evidence = String(task.markschemeLatex || "")
+      .replace(/^Award marks for\s+/i, "")
+      .replace(/\.$/, "");
+    return "Build the solution around " + lowerFirst(evidence) + ".";
   }
 
-  function checkForPoint(point) {
-    const text = (point.label + " " + point.description + " " + (point.skills || []).join(" ")).toLowerCase();
-    if (text.includes("standard form") || text.includes("scientific")) return "Check that the coefficient is at least 1 and less than 10, and that the power of ten has the correct sign.";
-    if (text.includes("arithmetic")) return "Check that the common difference is constant before using an arithmetic term or sum formula.";
-    if (text.includes("geometric") && text.includes("infinite")) return "Check that the common ratio satisfies |r| < 1 before using a sum to infinity.";
-    if (text.includes("geometric")) return "Check that each term is multiplied by the same common ratio before using a geometric formula.";
-    if (text.includes("financial") || text.includes("compound") || text.includes("depreciation")) return "Check whether the multiplier should be greater than 1 for growth or less than 1 for depreciation.";
-    if (text.includes("log")) return "Check that every logarithm input is positive and that the logarithm base is valid.";
-    if (text.includes("proof") || text.includes("induction") || text.includes("counterexample")) return "Check that the argument covers the general case, not only a single numerical example.";
-    if (text.includes("binomial")) return "Check the chosen binomial term, coefficient and sign before simplifying.";
-    if (text.includes("partial fraction")) return "Check that denominator factors and restrictions have been handled before comparing coefficients.";
-    if (text.includes("complex")) return "Check the quadrant or argument convention when moving between complex forms.";
-    if (text.includes("system") || text.includes("linear equations")) return "Check whether the system has a unique solution, no solution or infinitely many solutions.";
-    if (text.includes("domain") || text.includes("range") || text.includes("inverse")) return "Check the domain and range restrictions before stating an inverse or graph feature.";
-    if (text.includes("quadratic") || text.includes("discriminant")) return "Check whether the requested form is factorized, vertex or standard form, and interpret the discriminant correctly.";
-    if (text.includes("rational") || text.includes("asymptote")) return "Check vertical restrictions from the denominator and long-run behaviour for asymptotes.";
-    if (text.includes("transformation")) return "Check whether each change acts on the input, the output, or both.";
-    if (text.includes("trigonometric") || text.includes("trig") || text.includes("radian") || text.includes("sine") || text.includes("cosine")) return "Check the angle units, quadrant and interval before giving trigonometric values or solutions.";
-    if (text.includes("vector") || text.includes("plane") || text.includes("line")) return "Check whether the calculation needs a direction vector, normal vector, scalar product or vector product.";
-    if (text.includes("sampling") || text.includes("bias") || text.includes("outlier")) return "Check whether the sampling method could introduce bias or whether an outlier changes the interpretation.";
-    if (text.includes("correlation") || text.includes("regression")) return "Check the direction of prediction and avoid extrapolating beyond the data range.";
-    if (text.includes("probability") || text.includes("bayes") || text.includes("independence")) return "Check whether events are independent, conditional or mutually exclusive before choosing a probability rule.";
-    if (text.includes("binomial distribution")) return "Check that there is a fixed number of independent trials with a constant success probability.";
-    if (text.includes("normal") || text.includes("z-score")) return "Check whether the value must be standardized before using normal probabilities or inverse normal calculations.";
-    if (text.includes("random variable") || text.includes("density") || text.includes("variance")) return "Check that probabilities or density integrate/sum to 1 before calculating expectation or variance.";
-    if (text.includes("derivative") || text.includes("differentiation") || text.includes("tangent") || text.includes("normal")) return "Check whether the derivative is being used as a gradient, rate of change or classification tool.";
-    if (text.includes("integral") || text.includes("integration") || text.includes("area") || text.includes("volume")) return "Check limits, constants of integration and whether the integral represents signed area or total area.";
-    if (text.includes("kinematics")) return "Check whether displacement, velocity, acceleration or total distance is being requested.";
-    if (text.includes("differential equation") || text.includes("euler")) return "Check the initial condition, step size and whether an exact or numerical solution is required.";
-    if (text.includes("maclaurin") || text.includes("series")) return "Check the centre, required order and interval or approximation restrictions for the series.";
-    return "Check that the method matches " + point.shortLabel + " and any stated restrictions are respected.";
+  function evidenceForTask(task) {
+    return lowerFirst(String(task.markschemeLatex || "")
+      .replace(/^Award marks for\s+/i, "")
+      .replace(/\.$/, ""));
   }
 
-  function checkDistractors(point) {
-    return unique(flattenSyllabus()
-      .filter((candidate) => candidate.id !== point.id)
-      .map(checkForPoint));
+  function resultDistractors(task) {
+    const evidence = evidenceForTask(task);
+    return [
+      "Start with the requested conclusion and work backwards, without checking that each reversed step is valid.",
+      "Alter one of the given values or conditions before completing the required method: " + evidence + ".",
+      "Give an unverified decimal or symbolic expression without demonstrating the required method: " + evidence + "."
+    ];
+  }
+
+  function methodDistractors(task) {
+    const evidence = evidenceForTask(task);
+    return [
+      "Assume the requested conclusion first, then cite this only as confirmation: " + evidence + ".",
+      "Replace the required reasoning with a numerical guess; the missing evidence would be: " + evidence + ".",
+      "Complete only part of the method and ignore restrictions, intervals, units or exactness; the required evidence is: " + evidence + "."
+    ];
+  }
+
+  function checkForTask(task) {
+    const evidence = String(task.markschemeLatex || "")
+      .replace(/^Award marks for\s+/i, "")
+      .replace(/\.$/, "");
+    return "Verify this requirement: " + lowerFirst(evidence) + ". Then confirm that the final conclusion answers every part of the question.";
+  }
+
+  function checkDistractors(task) {
+    const evidence = evidenceForTask(task);
+    return [
+      "Repeat the same calculation rather than independently checking this requirement: " + evidence + ".",
+      "Check only the rounded display value before confirming this requirement: " + evidence + ".",
+      "Check the presentation and notation while leaving this requirement untested: " + evidence + "."
+    ];
+  }
+
+  function failureForTask(task) {
+    return "Failing to verify this requirement: " + evidenceForTask(task) + ".";
+  }
+
+  function misconceptionDistractors(task) {
+    const evidence = evidenceForTask(task);
+    return [
+      "Keeping extra numerical precision while completing this requirement: " + evidence + ".",
+      "Using equivalent notation after this requirement has been met: " + evidence + ".",
+      "Adding a clear supporting diagram or table without changing the reasoning for this requirement: " + evidence + "."
+    ];
   }
 
   function paperMeta(point, index) {
@@ -471,7 +509,7 @@
     };
   }
 
-  function baseQuestion(point, index, promptLatex, choicesData, commandTerm, explanation, hint) {
+  function baseQuestion(point, index, promptLatex, choicesData, commandTerm, workedSolution, explanation, hint) {
     const clean = point.id.replace("AA-", "").replace(/\./g, "-");
     const meta = paperMeta(point, index);
     return {
@@ -496,67 +534,87 @@
       diagram: null,
       choices: choicesData.choices,
       correctIndex: choicesData.correctIndex,
-      workedSolutionLatex: explanation,
-      explanation: "This MCQ is categorised under " + point.id + ": " + point.description,
+      workedSolutionLatex: workedSolution,
+      explanation,
       hint,
       estimatedTimeSeconds: 80 + index * 15
     };
   }
 
   function resultQuestion(point, task, index) {
-    const correct = task.workedSolutionLatex;
-    const distractors = allResultDistractors(point, task);
-    const choicesData = makeChoices(correct, distractors, index, true);
+    const correct = "Use this complete line of reasoning: " + task.workedSolutionLatex;
+    const distractors = resultDistractors(task);
+    const choicesData = makeChoices(correct, distractors, questionSeed(point, index, "result"), true);
     return baseQuestion(
       point,
       index,
-      task.promptLatex + "<br><br>Which option gives the correct result or conclusion?",
+      task.promptLatex + "<br><br>Which option gives a valid line of reasoning and the correct conclusion?",
       choicesData,
       index % 2 === 0 ? "determine" : "calculate",
-      task.workedSolutionLatex,
+      correct,
+      task.markschemeLatex + " The other options use conclusions that do not follow from the data in this problem.",
       "Focus on the skill: " + point.skills[index % point.skills.length] + ". Keep the work within " + point.shortLabel + "."
     );
   }
 
-  function descriptionQuestion(point, index) {
-    const correct = point.description;
-    const choicesData = makeChoices(correct, descriptionDistractors(point), index, false);
+  function strategyQuestion(point, task, index) {
+    const correct = methodForTask(task);
+    const choicesData = makeChoices(correct, methodDistractors(task), questionSeed(point, index, "strategy"), false);
     return baseQuestion(
       point,
       index,
-      "Which description best matches \\(" + point.id + "\\), " + point.shortLabel + "?",
-      choicesData,
-      "identify",
-      "The correct description is: " + point.description,
-      "Compare the words in the option with " + point.label + "."
-    );
-  }
-
-  function skillQuestion(point, index) {
-    const correct = point.skills[index % point.skills.length];
-    const choicesData = makeChoices(correct, skillDistractors(point), index, false);
-    return baseQuestion(
-      point,
-      index,
-      "In a question on " + point.shortLabel + ", which action is most directly relevant?",
+      "A student wants a concise, defensible solution to the following problem:<br><br>" + task.promptLatex + "<br><br>Which plan makes the best use of the given information?",
       choicesData,
       "select",
-      "A relevant action for " + point.id + " is to " + correct + ".",
-      "Think about the skill list for " + point.shortLabel + "."
+      correct + " Applying this plan gives: " + task.workedSolutionLatex,
+      "The strongest plan directly addresses every quantity and condition in the problem.",
+      "Separate the information you are given from the result you must establish."
     );
   }
 
-  function checkQuestion(point, index) {
-    const correct = checkForPoint(point);
-    const choicesData = makeChoices(correct, checkDistractors(point), index, false);
+  function reasoningQuestion(point, task, index) {
+    const correct = methodForTask(task);
+    const distractors = methodDistractors(task);
+    const choicesData = makeChoices(correct, distractors.slice(1).concat(distractors.slice(0, 1)), questionSeed(point, index, "reasoning"), false);
     return baseQuestion(
       point,
       index,
-      "A student is answering a question on " + point.shortLabel + ". Which check is most important?",
+      "Consider the problem:<br><br>" + task.promptLatex + "<br><br>A complete solution has been proposed:<br><br>" + task.workedSolutionLatex + "<br><br>Which statement identifies the decisive mathematical reasoning?",
       choicesData,
       "justify",
       correct,
-      "Focus on the restriction, condition or interpretation attached to " + point.shortLabel + "."
+      "The decisive reasoning is the step that connects the given information to the requested result.",
+      "Look for the option that explains why the displayed solution works, not one that merely names a nearby topic."
+    );
+  }
+
+  function errorAnalysisQuestion(point, task, index) {
+    const correct = failureForTask(task);
+    const choicesData = makeChoices(correct, misconceptionDistractors(task), questionSeed(point, index, "error"), false);
+    return baseQuestion(
+      point,
+      index,
+      "A class is reviewing this problem before submitting a final answer:<br><br>" + task.promptLatex + "<br><br>Which oversight would most directly make a solution to this particular problem unreliable?",
+      choicesData,
+      "analyse",
+      correct + " The reliable approach is: " + task.workedSolutionLatex,
+      "This error is directly connected to a condition, interpretation or validity check required by the problem.",
+      "Ask which option could invalidate an otherwise fluent calculation in this exact setting."
+    );
+  }
+
+  function validationQuestion(point, task, index) {
+    const correct = checkForTask(task);
+    const choicesData = makeChoices(correct, checkDistractors(task), questionSeed(point, index, "validation"), false);
+    return baseQuestion(
+      point,
+      index,
+      "After solving the following problem, a student wants to test whether the conclusion is trustworthy:<br><br>" + task.promptLatex + "<br><br>Which verification is most relevant before the answer is accepted?",
+      choicesData,
+      "verify",
+      correct + " A correct solution is: " + task.workedSolutionLatex,
+      "This check tests a condition that is essential to the calculation or interpretation in the displayed problem.",
+      "Prioritize a check that can change whether the answer is valid, not one imported from another kind of problem."
     );
   }
 
@@ -566,10 +624,10 @@
     return [
       resultQuestion(point, pointTasks[0], 0),
       resultQuestion(point, pointTasks[1], 1),
-      descriptionQuestion(point, 2),
-      skillQuestion(point, 3),
-      checkQuestion(point, 4),
-      skillQuestion(point, 5)
+      strategyQuestion(point, pointTasks[0], 2),
+      reasoningQuestion(point, pointTasks[1], 3),
+      errorAnalysisQuestion(point, pointTasks[0], 4),
+      validationQuestion(point, pointTasks[1], 5)
     ];
   }
 
