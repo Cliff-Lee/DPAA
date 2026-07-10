@@ -436,64 +436,218 @@
     return text ? text.charAt(0).toLowerCase() + text.slice(1) : text;
   }
 
-  function methodForTask(task) {
-    const evidence = String(task.markschemeLatex || "")
-      .replace(/^Award marks for\s+/i, "")
-      .replace(/\.$/, "");
-    return "Build the solution around " + lowerFirst(evidence) + ".";
-  }
-
   function evidenceForTask(task) {
     return lowerFirst(String(task.markschemeLatex || "")
       .replace(/^Award marks for\s+/i, "")
       .replace(/\.$/, ""));
   }
 
-  function resultDistractors(task) {
-    const evidence = evidenceForTask(task);
-    return [
-      "Start with the requested conclusion and work backwards, without checking that each reversed step is valid.",
-      "Alter one of the given values or conditions before completing the required method: " + evidence + ".",
-      "Give an unverified decimal or symbolic expression without demonstrating the required method: " + evidence + "."
+  const semanticGroups = [
+    ["there are no real roots", "there are two distinct real roots", "there is one repeated real root", "the equation has infinitely many real roots"],
+    ["two real roots", "one repeated real root", "no real roots", "infinitely many roots"],
+    ["all real numbers", "\\(x>0\\)", "\\(x\\ge0\\)", "\\(x\\ne0\\)"],
+    ["positive skew", "negative skew", "symmetric", "no clear skew"],
+    ["negative skew", "positive skew", "symmetric", "no clear skew"],
+    ["strong negative linear correlation", "weak negative linear correlation", "strong positive linear correlation", "no linear correlation"],
+    ["convenience sampling", "simple random sampling", "systematic sampling", "stratified sampling"],
+    ["over-represent", "under-represent", "represent exactly", "exclude"],
+    ["not fair", "fair", "certain", "impossible"],
+    ["independent", "mutually exclusive", "dependent", "complementary"],
+    ["coincident", "distinct parallel", "skew", "intersecting"],
+    ["skew", "parallel", "coincident", "intersecting"],
+    ["perpendicular", "parallel", "coincident", "skew"],
+    ["concave down", "concave up", "increasing", "decreasing"],
+    ["concave up", "concave down", "increasing", "decreasing"],
+    ["decreasing", "increasing", "constant", "stationary"],
+    ["increasing", "decreasing", "constant", "stationary"],
+    ["minimum", "maximum", "local maximum", "stationary point"],
+    ["maximum", "minimum", "local minimum", "stationary point"],
+    ["not differentiable", "differentiable", "stationary", "discontinuous"],
+    ["even", "odd", "neither", "one-to-one"],
+    ["odd", "even", "neither", "one-to-one"],
+    ["not prime", "prime", "even", "irrational"],
+    ["lies on the plane", "does not lie on the plane", "is parallel to the plane", "is normal to the plane"],
+    ["extrapolation", "interpolation", "causation", "standardization"],
+    ["unreliable", "reliable", "exact", "unbiased"],
+    ["quadrant II", "quadrant I", "quadrant III", "quadrant IV"]
+  ];
+
+  function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^$()|[\]{}\\]/g, "\\$&");
+  }
+
+  function replaceRange(value, start, end, replacement) {
+    return value.slice(0, start) + replacement + value.slice(end);
+  }
+
+  function mathNumberOccurrences(value) {
+    const occurrences = [];
+    const mathPattern = /\\\(([\s\S]*?)\\\)/g;
+    const mathRanges = [];
+    let mathMatch;
+    while ((mathMatch = mathPattern.exec(value))) {
+      mathRanges.push({
+        start: mathMatch.index + 2,
+        end: mathMatch.index + mathMatch[0].length - 2
+      });
+    }
+
+    const numberPattern = /[+-]?\d+(?:\.\d+)?/g;
+    let numberMatch;
+    while ((numberMatch = numberPattern.exec(value))) {
+      const inMath = mathRanges.some((range) =>
+        numberMatch.index >= range.start && numberMatch.index < range.end);
+      const prefix = value.slice(Math.max(0, numberMatch.index - 10), numberMatch.index);
+      if (inMath && /\\(?:frac|binom|sqrt)\s*$/.test(prefix)) continue;
+      occurrences.push({
+        type: "number",
+        value: numberMatch[0],
+        start: numberMatch.index,
+        end: numberMatch.index + numberMatch[0].length,
+        inMath
+      });
+    }
+    return occurrences;
+  }
+
+  function semanticOccurrences(value) {
+    const lowerValue = value.toLowerCase();
+    const occurrences = [];
+    semanticGroups.forEach((answers) => {
+      const phrase = answers[0];
+      const pattern = new RegExp("\\b" + escapeRegExp(phrase) + "\\b", "i");
+      const match = pattern.exec(lowerValue);
+      if (match) {
+        occurrences.push({
+          type: "semantic",
+          value: value.slice(match.index, match.index + match[0].length),
+          start: match.index,
+          end: match.index + match[0].length,
+          answers
+        });
+      }
+    });
+    return occurrences;
+  }
+
+  function numericAlternatives(token, seed, offsetHint = null) {
+    const value = Number(token);
+    const unsignedToken = token.replace(/^[+-]/, "");
+    const decimals = unsignedToken.includes(".") ? unsignedToken.split(".")[1].length : 0;
+    const unit = decimals ? 10 ** (-decimals) : 1;
+    const offset = offsetHint || (hashText(seed) % 3) + 1;
+    const hasExplicitSign = /^[+-]/.test(token);
+    const candidates = value === 0
+      ? [unit * offset, -unit * offset, unit * (offset + 1), -unit * (offset + 1)]
+      : [
+          -value,
+          value + unit * offset,
+          value - unit * offset,
+          value * 2,
+          value + unit * offset * 2,
+          value - unit * offset * 2
+        ];
+    return unique(candidates.map((candidate) => {
+      const normalized = Object.is(candidate, -0) ? 0 : candidate;
+      const formatted = decimals ? normalized.toFixed(decimals) : String(normalized);
+      return hasExplicitSign && normalized >= 0 ? "+" + formatted : formatted;
+    })).filter((candidate) => {
+      if (candidate === token) return false;
+      return value === 0 || Number(candidate) !== 0;
+    }).slice(0, 3);
+  }
+
+  function semanticAlternatives(occurrence) {
+    return occurrence.answers
+      .filter((answer) => answer.toLowerCase() !== occurrence.value.toLowerCase())
+      .slice(0, 3);
+  }
+
+  function mutateOccurrence(value, occurrence, replacement) {
+    const previousCharacter = value.slice(0, occurrence.start).trimEnd().slice(-1);
+    const formatted = occurrence.type === "number"
+      && occurrence.inMath
+      && (previousCharacter === "^" || previousCharacter === "_")
+      && replacement.length > 1
+      ? "{" + replacement + "}"
+      : replacement;
+    return replaceRange(value, occurrence.start, occurrence.end, formatted);
+  }
+
+  function solutionDistractors(task, seed) {
+    const solution = task.workedSolutionLatex;
+    const numberOccurrences = mathNumberOccurrences(solution);
+    const semantic = semanticOccurrences(solution);
+    const variants = [];
+
+    semantic.forEach((occurrence) => {
+      semanticAlternatives(occurrence).forEach((replacement) => {
+        if (variants.length < 3) variants.push(mutateOccurrence(solution, occurrence, replacement));
+      });
+    });
+
+    const preferredNumbers = [
+      ...numberOccurrences.slice(-2).reverse(),
+      ...numberOccurrences.slice(0, 2),
+      ...numberOccurrences
     ];
-  }
+    preferredNumbers.forEach((occurrence, occurrenceIndex) => {
+      const alternatives = numericAlternatives(occurrence.value, seed + ":" + occurrenceIndex);
+      alternatives.forEach((replacement) => {
+        if (variants.length < 3) variants.push(mutateOccurrence(solution, occurrence, replacement));
+      });
+    });
 
-  function methodDistractors(task) {
     const evidence = evidenceForTask(task);
-    return [
-      "Assume the requested conclusion first, then cite this only as confirmation: " + evidence + ".",
-      "Replace the required reasoning with a numerical guess; the missing evidence would be: " + evidence + ".",
-      "Complete only part of the method and ignore restrictions, intervals, units or exactness; the required evidence is: " + evidence + "."
+    const fallbacks = [
+      "Use " + evidence + ", but reverse the final sign or inequality.",
+      "Use " + evidence + ", but omit a required restriction or interval.",
+      "Use " + evidence + ", but round before the exact result is established."
     ];
+    return unique([...variants, ...fallbacks])
+      .filter((variant) => variant !== solution)
+      .slice(0, 3);
   }
 
-  function checkForTask(task) {
-    const evidence = String(task.markschemeLatex || "")
-      .replace(/^Award marks for\s+/i, "")
-      .replace(/\.$/, "");
-    return "Verify this requirement: " + lowerFirst(evidence) + ". Then confirm that the final conclusion answers every part of the question.";
-  }
+  function clozeData(task, variantIndex, seed) {
+    const numberOccurrences = mathNumberOccurrences(task.workedSolutionLatex);
+    const semantic = semanticOccurrences(task.workedSolutionLatex);
+    const candidates = [...numberOccurrences, ...semantic];
 
-  function checkDistractors(task) {
-    const evidence = evidenceForTask(task);
-    return [
-      "Repeat the same calculation rather than independently checking this requirement: " + evidence + ".",
-      "Check only the rounded display value before confirming this requirement: " + evidence + ".",
-      "Check the presentation and notation while leaving this requirement untested: " + evidence + "."
-    ];
-  }
+    if (!candidates.length) {
+      const correct = evidenceForTask(task);
+      return {
+        display: task.promptLatex,
+        correct,
+        distractors: [
+          "reverse the final implication",
+          "omit the stated restriction",
+          "substitute into a neighbouring formula"
+        ],
+        workedSolution: "The required method is " + correct + ". " + task.workedSolutionLatex
+      };
+    }
 
-  function failureForTask(task) {
-    return "Failing to verify this requirement: " + evidenceForTask(task) + ".";
-  }
-
-  function misconceptionDistractors(task) {
-    const evidence = evidenceForTask(task);
-    return [
-      "Keeping extra numerical precision while completing this requirement: " + evidence + ".",
-      "Using equivalent notation after this requirement has been met: " + evidence + ".",
-      "Adding a clear supporting diagram or table without changing the reasoning for this requirement: " + evidence + "."
-    ];
+    const candidateIndex = variantIndex === 0
+      ? candidates.length - 1
+      : Math.max(0, candidates.length - 2);
+    const candidate = candidates[candidateIndex];
+    const isNumber = candidate.type === "number";
+    const correct = isNumber && candidate.inMath ? "\\(" + candidate.value + "\\)" : candidate.value;
+    const rawDistractors = isNumber
+      ? numericAlternatives(candidate.value, seed, variantIndex + 1).map((value) =>
+        candidate.inMath ? "\\(" + value + "\\)" : value)
+      : semanticAlternatives(candidate);
+    return {
+      display: mutateOccurrence(
+        task.workedSolutionLatex,
+        candidate,
+        isNumber && candidate.inMath ? "\\boxed{?}" : "[blank]"
+      ),
+      correct,
+      distractors: rawDistractors,
+      workedSolution: "The missing entry is " + correct + ". " + task.workedSolutionLatex
+    };
   }
 
   function paperMeta(point, index) {
@@ -542,79 +696,35 @@
   }
 
   function resultQuestion(point, task, index) {
-    const correct = "Use this complete line of reasoning: " + task.workedSolutionLatex;
-    const distractors = resultDistractors(task);
+    const correct = task.workedSolutionLatex;
+    const seed = questionSeed(point, index, "result");
+    const distractors = solutionDistractors(task, seed);
     const choicesData = makeChoices(correct, distractors, questionSeed(point, index, "result"), true);
     return baseQuestion(
       point,
       index,
-      task.promptLatex + "<br><br>Which option gives a valid line of reasoning and the correct conclusion?",
+      task.promptLatex + "<br><br>Which solution is correct?",
       choicesData,
       index % 2 === 0 ? "determine" : "calculate",
       correct,
-      task.markschemeLatex + " The other options use conclusions that do not follow from the data in this problem.",
-      "Focus on the skill: " + point.skills[index % point.skills.length] + ". Keep the work within " + point.shortLabel + "."
+      task.markschemeLatex + " Each distractor represents a plausible arithmetic, sign, interval or interpretation error.",
+      "Check each step, not only the final value."
     );
   }
 
-  function strategyQuestion(point, task, index) {
-    const correct = methodForTask(task);
-    const choicesData = makeChoices(correct, methodDistractors(task), questionSeed(point, index, "strategy"), false);
+  function clozeQuestion(point, task, index, variantIndex, promptLead, commandTerm) {
+    const seed = questionSeed(point, index, "cloze");
+    const cloze = clozeData(task, variantIndex, seed);
+    const choicesData = makeChoices(cloze.correct, cloze.distractors, seed, false);
     return baseQuestion(
       point,
       index,
-      "A student wants a concise, defensible solution to the following problem:<br><br>" + task.promptLatex + "<br><br>Which plan makes the best use of the given information?",
+      promptLead + "<br><br>" + task.promptLatex + "<br><br><strong>Working:</strong><br>" + cloze.display,
       choicesData,
-      "select",
-      correct + " Applying this plan gives: " + task.workedSolutionLatex,
-      "The strongest plan directly addresses every quantity and condition in the problem.",
-      "Separate the information you are given from the result you must establish."
-    );
-  }
-
-  function reasoningQuestion(point, task, index) {
-    const correct = methodForTask(task);
-    const distractors = methodDistractors(task);
-    const choicesData = makeChoices(correct, distractors.slice(1).concat(distractors.slice(0, 1)), questionSeed(point, index, "reasoning"), false);
-    return baseQuestion(
-      point,
-      index,
-      "Consider the problem:<br><br>" + task.promptLatex + "<br><br>A complete solution has been proposed:<br><br>" + task.workedSolutionLatex + "<br><br>Which statement identifies the decisive mathematical reasoning?",
-      choicesData,
-      "justify",
-      correct,
-      "The decisive reasoning is the step that connects the given information to the requested result.",
-      "Look for the option that explains why the displayed solution works, not one that merely names a nearby topic."
-    );
-  }
-
-  function errorAnalysisQuestion(point, task, index) {
-    const correct = failureForTask(task);
-    const choicesData = makeChoices(correct, misconceptionDistractors(task), questionSeed(point, index, "error"), false);
-    return baseQuestion(
-      point,
-      index,
-      "A class is reviewing this problem before submitting a final answer:<br><br>" + task.promptLatex + "<br><br>Which oversight would most directly make a solution to this particular problem unreliable?",
-      choicesData,
-      "analyse",
-      correct + " The reliable approach is: " + task.workedSolutionLatex,
-      "This error is directly connected to a condition, interpretation or validity check required by the problem.",
-      "Ask which option could invalidate an otherwise fluent calculation in this exact setting."
-    );
-  }
-
-  function validationQuestion(point, task, index) {
-    const correct = checkForTask(task);
-    const choicesData = makeChoices(correct, checkDistractors(task), questionSeed(point, index, "validation"), false);
-    return baseQuestion(
-      point,
-      index,
-      "After solving the following problem, a student wants to test whether the conclusion is trustworthy:<br><br>" + task.promptLatex + "<br><br>Which verification is most relevant before the answer is accepted?",
-      choicesData,
-      "verify",
-      correct + " A correct solution is: " + task.workedSolutionLatex,
-      "This check tests a condition that is essential to the calculation or interpretation in the displayed problem.",
-      "Prioritize a check that can change whether the answer is valid, not one imported from another kind of problem."
+      commandTerm,
+      cloze.workedSolution,
+      task.markschemeLatex,
+      "Recalculate the missing entry from the line immediately before it."
     );
   }
 
@@ -624,10 +734,10 @@
     return [
       resultQuestion(point, pointTasks[0], 0),
       resultQuestion(point, pointTasks[1], 1),
-      strategyQuestion(point, pointTasks[0], 2),
-      reasoningQuestion(point, pointTasks[1], 3),
-      errorAnalysisQuestion(point, pointTasks[0], 4),
-      validationQuestion(point, pointTasks[1], 5)
+      clozeQuestion(point, pointTasks[0], 2, 0, "Complete the missing value or expression.", "select"),
+      clozeQuestion(point, pointTasks[1], 3, 0, "Which entry completes the decisive step?", "justify"),
+      clozeQuestion(point, pointTasks[0], 4, 1, "A student has left a gap in the working. Which entry makes the solution valid?", "analyse"),
+      clozeQuestion(point, pointTasks[1], 5, 1, "Which entry makes the final verification consistent?", "verify")
     ];
   }
 
