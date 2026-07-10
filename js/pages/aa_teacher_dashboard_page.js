@@ -1,4 +1,10 @@
 (function () {
+  const SELECTED_CLASS_KEY = "AA_TEACHER_SELECTED_CLASS";
+  let teacherClasses = [];
+  let classesAreLoading = false;
+  let loadedTeacherUid = "";
+  let loadingTeacherDataPromise = null;
+
   const filters = {
     classCode: "",
     courseLevel: "all",
@@ -16,13 +22,19 @@
   }
 
   function bindEvents() {
-    ["classFilter", "levelFilter", "topicFilter", "contentLevelFilter", "paperFilter", "timeFilter"].forEach((id) => {
+    AA_UI.byId("classFilter").addEventListener("change", () => {
+      selectClass(AA_UI.byId("classFilter").value);
+    });
+    ["levelFilter", "topicFilter", "contentLevelFilter", "paperFilter", "timeFilter"].forEach((id) => {
       AA_UI.byId(id).addEventListener("input", readFiltersAndRender);
     });
     AA_UI.byId("exportCsvButton").addEventListener("click", exportCSV);
     AA_UI.byId("resetDashboardButton").addEventListener("click", resetData);
     AA_UI.byId("teacherLoginForm")?.addEventListener("submit", signInTeacher);
     AA_UI.byId("teacherSignOutButton")?.addEventListener("click", signOutTeacher);
+    AA_UI.byId("openCreateClassButton")?.addEventListener("click", showCreateClassPanel);
+    AA_UI.byId("cancelCreateClassButton")?.addEventListener("click", hideCreateClassPanel);
+    AA_UI.byId("createClassForm")?.addEventListener("submit", createTeacherClass);
   }
 
   function bindStorageEvents() {
@@ -73,7 +85,7 @@
       signedInActions?.classList.add("hidden");
       setDashboardContentVisible(true);
       if (resetButton) resetButton.textContent = "Reset local data";
-      renderDashboard();
+      loadTeacherClassesAndRefresh({ force: true });
       return;
     }
 
@@ -107,10 +119,9 @@
     signedInActions?.classList.remove("hidden");
     setAuthStatus(`Signed in as ${user.email || "teacher"}. Loading class data...`);
     setDashboardContentVisible(true);
-    AAStorage.loadAllDataForTeacher?.()
+    loadTeacherClassesAndRefresh({ user })
       .then(() => {
         setAuthStatus(`Signed in as ${user.email || "teacher"}.`);
-        renderDashboard();
       })
       .catch((error) => {
         setDashboardContentVisible(false);
@@ -133,7 +144,7 @@
     setAuthStatus("Signing in...");
     try {
       await AAStorage.signInTeacher(email, password);
-      configureStorageMode();
+      setAuthStatus("Signed in. Loading classes...");
     } catch (error) {
       setAuthStatus(error.message || "Teacher sign-in failed.", true);
     } finally {
@@ -145,6 +156,9 @@
     if (!AAStorage.signOutTeacher) return;
     try {
       await AAStorage.signOutTeacher();
+      teacherClasses = [];
+      loadedTeacherUid = "";
+      loadingTeacherDataPromise = null;
       configureStorageMode();
     } catch (error) {
       setAuthStatus(error.message || "Teacher sign-out failed.", true);
@@ -159,14 +173,193 @@
     AA_UI.byId("topicFilter").innerHTML = options.join("");
   }
 
+  // Class management: dropdown, create-class panel and My Classes list.
+  function setClassesLoading(isLoading) {
+    classesAreLoading = isLoading;
+    const status = AA_UI.byId("classLoadingStatus");
+    if (status && isLoading) status.textContent = "Loading classes...";
+    AA_UI.byId("classFilter").disabled = isLoading;
+    renderMyClasses();
+  }
+
+  function getClassLabel(klass) {
+    const name = klass.name || klass.classCode;
+    return `${name} (${klass.classCode})`;
+  }
+
+  function getStoredClassCode() {
+    return localStorage.getItem(SELECTED_CLASS_KEY) || "";
+  }
+
+  function saveSelectedClassCode(classCode) {
+    if (classCode) localStorage.setItem(SELECTED_CLASS_KEY, classCode);
+    else localStorage.removeItem(SELECTED_CLASS_KEY);
+  }
+
+  function classExists(classCode) {
+    return teacherClasses.some((klass) => klass.classCode === classCode);
+  }
+
+  function populateClassDropdown(preferredClassCode = null) {
+    const select = AA_UI.byId("classFilter");
+    const storedClassCode = preferredClassCode ?? getStoredClassCode();
+    const selectedClassCode = storedClassCode && classExists(storedClassCode) ? storedClassCode : "";
+    select.innerHTML = [
+      '<option value="">All classes</option>',
+      ...teacherClasses.map((klass) => `
+        <option value="${AA_UI.escapeHtml(klass.classCode)}">${AA_UI.escapeHtml(getClassLabel(klass))}</option>
+      `)
+    ].join("");
+    select.value = selectedClassCode;
+    filters.classCode = selectedClassCode;
+    if (storedClassCode && !selectedClassCode) saveSelectedClassCode("");
+  }
+
+  function renderMyClasses() {
+    const status = AA_UI.byId("classLoadingStatus");
+    const list = AA_UI.byId("myClassesList");
+    if (!status || !list) return;
+
+    if (classesAreLoading) {
+      status.textContent = "Loading classes...";
+      list.innerHTML = "";
+      return;
+    }
+
+    if (!teacherClasses.length) {
+      status.textContent = "No classes yet. Create your first class.";
+      list.innerHTML = "";
+      return;
+    }
+
+    status.textContent = `${teacherClasses.length} class${teacherClasses.length === 1 ? "" : "es"}`;
+    list.innerHTML = teacherClasses.map((klass) => {
+      const studentText = Number.isFinite(klass.studentCount)
+        ? `${klass.studentCount} student${klass.studentCount === 1 ? "" : "s"}`
+        : "Students loading";
+      return `
+        <article class="class-list-item">
+          <div>
+            <strong>${AA_UI.escapeHtml(klass.name || klass.classCode)}</strong>
+            <small>${AA_UI.escapeHtml(klass.classCode)} | ${AA_UI.escapeHtml(studentText)}</small>
+          </div>
+          <button class="secondary-button open-class-button" type="button" data-class-code="${AA_UI.escapeHtml(klass.classCode)}">Open dashboard</button>
+        </article>
+      `;
+    }).join("");
+
+    list.querySelectorAll("[data-class-code]").forEach((button) => {
+      button.addEventListener("click", () => selectClass(button.dataset.classCode));
+    });
+  }
+
+  async function loadTeacherClassesAndRefresh(options = {}) {
+    const user = options.user || AAStorage.getAuthUser?.();
+    const userUid = user?.uid || "local";
+    if (!options.force && loadingTeacherDataPromise) return loadingTeacherDataPromise;
+    if (!options.force && loadedTeacherUid === userUid && teacherClasses.length) {
+      refreshDashboard();
+      return Promise.resolve(teacherClasses);
+    }
+
+    setClassesLoading(true);
+    loadingTeacherDataPromise = (async () => {
+      if (isFirebaseMode() && AAStorage.loadAllDataForTeacher) {
+        await AAStorage.loadAllDataForTeacher();
+      } else if (AAStorage.loadTeacherClasses) {
+        await AAStorage.loadTeacherClasses();
+      }
+      teacherClasses = AAStorage.getClasses?.() || AAStorage.loadTeacherClasses?.() || [];
+      populateClassDropdown(options.selectedClassCode);
+      loadedTeacherUid = userUid;
+      setClassesLoading(false);
+      refreshDashboard();
+      return teacherClasses;
+    })().catch((error) => {
+      setClassesLoading(false);
+      throw error;
+    }).finally(() => {
+      loadingTeacherDataPromise = null;
+    });
+    return loadingTeacherDataPromise;
+  }
+
+  function selectClass(classCode) {
+    const selectedClassCode = String(classCode || "").trim();
+    AA_UI.byId("classFilter").value = selectedClassCode;
+    filters.classCode = selectedClassCode;
+    saveSelectedClassCode(selectedClassCode);
+    refreshDashboard();
+  }
+
+  function showCreateClassPanel() {
+    AA_UI.byId("createClassPanel")?.classList.remove("hidden");
+    setCreateClassStatus("");
+    AA_UI.byId("newClassName")?.focus();
+  }
+
+  function hideCreateClassPanel() {
+    AA_UI.byId("createClassPanel")?.classList.add("hidden");
+    AA_UI.byId("createClassForm")?.reset();
+    setCreateClassStatus("");
+  }
+
+  function setCreateClassStatus(message, isError = false) {
+    const status = AA_UI.byId("createClassStatus");
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle("hidden", !message);
+    status.classList.toggle("auth-error", Boolean(isError));
+  }
+
+  function validateClassForm(name, classCode) {
+    if (!name || !classCode) return "Class name and class code are required.";
+    if (classCode.length < 3 || classCode.length > 30) return "Class code must be between 3 and 30 characters.";
+    if (!/^[A-Za-z0-9_-]+$/.test(classCode)) return "Class code can only contain letters, numbers, hyphens or underscores.";
+    return "";
+  }
+
+  async function createTeacherClass(event) {
+    event.preventDefault();
+    const name = AA_UI.byId("newClassName").value.trim();
+    const classCode = AA_UI.byId("newClassCode").value.trim();
+    const validationError = validateClassForm(name, classCode);
+    if (validationError) {
+      setCreateClassStatus(validationError, true);
+      return;
+    }
+
+    const button = AA_UI.byId("createClassSubmitButton");
+    if (button) button.disabled = true;
+    setCreateClassStatus("Creating class...");
+    try {
+      const createdClass = await AAStorage.createTeacherClass({ name, classCode });
+      hideCreateClassPanel();
+      await loadTeacherClassesAndRefresh({
+        force: true,
+        selectedClassCode: createdClass.classCode || classCode
+      });
+      selectClass(createdClass.classCode || classCode);
+      AA_UI.byId("classLoadingStatus").textContent = "Class created successfully";
+    } catch (error) {
+      setCreateClassStatus(error.message || "Class creation failed.", true);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  function refreshDashboard() {
+    renderDashboard();
+  }
+
   function readFiltersAndRender() {
-    filters.classCode = AA_UI.byId("classFilter").value.trim();
+    filters.classCode = AA_UI.byId("classFilter").value;
     filters.courseLevel = AA_UI.byId("levelFilter").value;
     filters.topicId = AA_UI.byId("topicFilter").value;
     filters.contentLevel = AA_UI.byId("contentLevelFilter").value;
     filters.paperStyle = AA_UI.byId("paperFilter").value;
     filters.timeWindow = AA_UI.byId("timeFilter").value;
-    renderDashboard();
+    refreshDashboard();
   }
 
   function getFilteredAttempts() {
@@ -246,7 +439,7 @@
       });
 
     AA_UI.byId("studentTableBody").innerHTML = rows.join("") || `
-      <tr><td colspan="7" class="empty-cell">No local attempts match these filters.</td></tr>
+      <tr><td colspan="7" class="empty-cell">No attempts match these filters.</td></tr>
     `;
   }
 
@@ -339,19 +532,25 @@
   }
 
   function exportCSV() {
-    const classCode = AA_UI.byId("classFilter").value.trim();
+    const classCode = AA_UI.byId("classFilter").value;
     const csv = AAStorage.exportClassCSV(classCode);
     const name = classCode ? `aa_${classCode}_attempts.csv` : "aa_all_attempts.csv";
     AA_UI.downloadText(name, csv, "text/csv");
   }
 
-  function resetData() {
+  async function resetData() {
+    const classCode = AA_UI.byId("classFilter").value;
     const message = isFirebaseMode()
-      ? "Delete Firebase attempt and syllabus-stat documents visible to this teacher? Class documents are kept."
-      : "Reset all locally saved AA demo attempts on this browser?";
+      ? (classCode
+        ? `Delete Firebase attempts for ${classCode}? Class documents are kept.`
+        : "Delete Firebase attempts for all of your classes? Class documents are kept.")
+      : (classCode
+        ? `Reset locally saved AA demo attempts for ${classCode}?`
+        : "Reset all locally saved AA demo attempts on this browser?");
     if (!window.confirm(message)) return;
-    AAStorage.clearAllData();
-    renderDashboard();
+    if (classCode && AAStorage.clearClassData) await AAStorage.clearClassData(classCode);
+    else await AAStorage.clearAllData();
+    await loadTeacherClassesAndRefresh({ force: true, selectedClassCode: classCode });
   }
 
   if (window.AAApp?.ready) {
