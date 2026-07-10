@@ -1,0 +1,105 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isRegisteredTeacher() {
+      return signedIn()
+        && !request.auth.token.firebase.sign_in_provider.matches('anonymous')
+        && exists(/databases/$(database)/documents/teachers/$(request.auth.uid));
+    }
+
+    function ownsClass(classCode) {
+      return isRegisteredTeacher()
+        && get(/databases/$(database)/documents/classes/$(classCode)).data.teacherUid
+          == request.auth.uid;
+    }
+
+    function isStudent(studentUid) {
+      return signedIn() && request.auth.uid == studentUid;
+    }
+
+    function isPublicDemo(classCode) {
+      return classCode == 'PUBLIC-DEMO';
+    }
+
+    match /teachers/{teacherUid} {
+      allow get: if signedIn() && request.auth.uid == teacherUid;
+      allow list, create, update, delete: if false;
+    }
+
+    match /classes/{classCode} {
+      // Anonymous students must be able to verify an exact class code.
+      allow get: if signedIn();
+
+      // Firestore evaluates this against the teacherUid equality query used by
+      // getTeacherClasses(); it does not expose another teacher's classes.
+      allow list: if isRegisteredTeacher()
+        && resource.data.teacherUid == request.auth.uid;
+
+      allow create: if (isRegisteredTeacher()
+          && request.resource.data.keys().hasOnly([
+            'name',
+            'teacherUid',
+            'createdAt'
+          ])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.teacherUid == request.auth.uid
+          && request.resource.data.createdAt == request.time)
+        || (signedIn()
+          && isPublicDemo(classCode)
+          && request.resource.data.keys().hasOnly([
+            'name',
+            'teacherUid',
+            'isPublicDemo',
+            'createdAt'
+          ])
+          && request.resource.data.name == 'Today’s public demo'
+          && request.resource.data.teacherUid == 'PUBLIC-DEMO'
+          && request.resource.data.isPublicDemo == true
+          && request.resource.data.createdAt == request.time);
+
+      allow update: if ownsClass(classCode)
+        && request.resource.data.teacherUid == resource.data.teacherUid;
+      allow delete: if ownsClass(classCode);
+
+      match /students/{studentUid} {
+        // Public demo activity is intentionally shared with every signed-in
+        // visitor. Writes remain isolated to each anonymous student's uid.
+        allow read: if (signedIn() && isPublicDemo(classCode)) || isStudent(studentUid) || ownsClass(classCode);
+
+        allow create, update: if isStudent(studentUid)
+          && request.resource.data.keys().hasOnly([
+            'nickname',
+            'courseLevel',
+            'joinedAt',
+            'lastSeen'
+          ])
+          && request.resource.data.nickname is string
+          && request.resource.data.courseLevel in ['SL', 'HL'];
+
+        allow delete: if ownsClass(classCode);
+
+        match /attempts/{attemptId} {
+          allow read: if (signedIn() && isPublicDemo(classCode)) || isStudent(studentUid) || ownsClass(classCode);
+          allow create, update: if isStudent(studentUid)
+            && request.resource.data.studentUid == studentUid
+            && request.resource.data.classCode == classCode
+            && request.resource.data.course == 'AA';
+          allow delete: if ownsClass(classCode);
+        }
+
+        match /syllabusStats/{syllabusId} {
+          allow read: if (signedIn() && isPublicDemo(classCode)) || isStudent(studentUid) || ownsClass(classCode);
+          allow create, update: if isStudent(studentUid)
+            && request.resource.data.syllabusId == syllabusId;
+          allow delete: if ownsClass(classCode);
+        }
+      }
+    }
+  }
+}
