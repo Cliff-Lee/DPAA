@@ -228,7 +228,7 @@
   async function startPractice(event) {
     event.preventDefault();
     const profile = {
-      classCode: AA_UI.byId("classCode").value.trim().toUpperCase(),
+      classCode: AA_UI.byId("classCode").value.trim(),
       nickname: AA_UI.byId("nickname").value.trim(),
       courseLevel: AA_UI.byId("courseLevel").value,
       mode: AA_UI.byId("practiceMode").value,

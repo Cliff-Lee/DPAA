@@ -160,7 +160,7 @@
   }
 
   function readFiltersAndRender() {
-    filters.classCode = AA_UI.byId("classFilter").value.trim().toUpperCase();
+    filters.classCode = AA_UI.byId("classFilter").value.trim();
     filters.courseLevel = AA_UI.byId("levelFilter").value;
     filters.topicId = AA_UI.byId("topicFilter").value;
     filters.contentLevel = AA_UI.byId("contentLevelFilter").value;
@@ -339,7 +339,7 @@
   }
 
   function exportCSV() {
-    const classCode = AA_UI.byId("classFilter").value.trim().toUpperCase();
+    const classCode = AA_UI.byId("classFilter").value.trim();
     const csv = AAStorage.exportClassCSV(classCode);
     const name = classCode ? `aa_${classCode}_attempts.csv` : "aa_all_attempts.csv";
     AA_UI.downloadText(name, csv, "text/csv");
