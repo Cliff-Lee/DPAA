@@ -645,6 +645,14 @@ async function createTeacherClass({ name, classCode }) {
     createdAt: serverTimestamp()
   };
 
+  console.log("Create class auth", {
+    uid: state.auth.currentUser?.uid || null,
+    email: state.auth.currentUser?.email || null,
+    isAnonymous: Boolean(state.auth.currentUser?.isAnonymous),
+    teacherVerified: Boolean(state.teacherVerified)
+  });
+  console.log("Creating class path", `classes/${cleanClassCode}`);
+  console.log("Creating class payload keys", Object.keys(payload));
   console.log("Creating class", cleanClassCode, payload);
   try {
     await setDoc(classRef(cleanClassCode), payload);
@@ -658,7 +666,7 @@ async function createTeacherClass({ name, classCode }) {
   } catch (error) {
     console.error("createTeacherClass failed:", error.code, error.message, error);
     if (error.code === "permission-denied") {
-      throw new Error("The class code may already be in use, or Firestore is blocking the class write.");
+      throw new Error(`Firestore denied creating classes/${cleanClassCode}. Try a brand-new class code. If that also fails, update the classes create rule to allow name, teacherUid and createdAt for this teacher.`);
     }
     throw error;
   }
