@@ -351,7 +351,7 @@ h3 {
 }
 
 .filter-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(220px, 1.2fr) auto repeat(2, minmax(160px, 1fr));
 }
 
 label {
@@ -420,6 +420,73 @@ a:focus-visible {
   display: grid;
   gap: 16px;
   margin-bottom: 18px;
+}
+
+.filter-action {
+  display: flex;
+  align-items: end;
+}
+
+.create-class-button {
+  white-space: nowrap;
+}
+
+.create-class-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--blue-soft);
+}
+
+.create-class-panel h2 {
+  margin-bottom: 0;
+}
+
+.create-class-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.65fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.create-class-actions {
+  align-items: end;
+}
+
+.class-management-area {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.my-classes-list {
+  display: grid;
+  gap: 10px;
+}
+
+.class-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.class-list-item strong,
+.class-list-item small {
+  display: block;
+}
+
+.class-list-item small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .auth-card {
@@ -1143,6 +1210,8 @@ svg text {
   .landing-actions,
   .setup-grid,
   .filter-grid,
+  .create-class-form,
+  .class-list-item,
   .practice-layout,
   .dashboard-grid,
   .auth-card,
