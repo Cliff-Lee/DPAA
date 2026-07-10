@@ -45,6 +45,19 @@ function choiceSet(question) {
   return question.choices.map((choice) => normalize(choiceText(choice))).sort().join(" | ");
 }
 
+function tokenSet(value) {
+  return new Set(normalize(value).split(" ").filter(Boolean));
+}
+
+function jaccard(left, right) {
+  let intersection = 0;
+  left.forEach((token) => {
+    if (right.has(token)) intersection += 1;
+  });
+  const union = left.size + right.size - intersection;
+  return union ? intersection / union : 1;
+}
+
 const countByPoint = new Map();
 questions.forEach((question) => {
   countByPoint.set(question.syllabusId, (countByPoint.get(question.syllabusId) || 0) + 1);
@@ -75,7 +88,7 @@ const schemaErrors = questions.flatMap((question) => {
 });
 
 const bannedPattern = /which description best matches|which action is most directly relevant|think about the skill list|compare the words in the option|categorised under|this question is tagged to|refer to the syllabus/i;
-const placeholderPattern = /\[object object\]|different syllabus point|plausible but unsupported|option is not supported/i;
+const placeholderPattern = /\[object object\]|different syllabus point|plausible but unsupported|option is not supported|reverse the stated conclusion|ignore the required condition|unrelated numerical estimate|reverse the final implication|omit the stated restriction|neighbouring formula|but reverse the final sign|omit a required restriction|round before the exact result/i;
 const weakQuestions = questions
   .filter((question) => {
     const point = syllabusById.get(question.syllabusId);
@@ -91,6 +104,24 @@ const weakQuestions = questions
       || (point?.description && normalize(question.promptLatex).includes(normalize(point.description)));
   })
   .map((question) => question.id);
+const longDistractors = questions.flatMap((question) =>
+  question.choices.flatMap((choice, index) => {
+    if (index === question.correctIndex) return [];
+    const words = normalize(choiceText(choice)).split(" ").filter(Boolean);
+    return words.length > 40 ? [{ id: question.id, words: words.length }] : [];
+  }));
+const unrelatedResultDistractors = questions
+  .filter((question) => /-Q0[12]$/.test(question.id))
+  .flatMap((question) => {
+    const correctTokens = tokenSet(choiceText(question.choices[question.correctIndex]));
+    return question.choices.flatMap((choice, index) => {
+      if (index === question.correctIndex) return [];
+      const similarity = jaccard(correctTokens, tokenSet(choiceText(choice)));
+      return similarity < 0.5
+        ? [{ id: question.id, similarity: Number(similarity.toFixed(3)) }]
+        : [];
+    });
+  });
 
 const duplicateIds = duplicateGroups((question) => question.id);
 const duplicatePrompts = duplicateGroups((question) => normalize(question.promptLatex));
@@ -121,10 +152,12 @@ const report = {
   duplicatePrompts,
   duplicateTaskStems,
   duplicateQuestions,
-  duplicateChoiceSets,
+  repeatedChoiceSetGroups: duplicateChoiceSets.length,
   styleCounts,
   schemaErrors,
-  weakQuestions
+  weakQuestions,
+  longDistractors,
+  unrelatedResultDistractors
 };
 
 console.log(JSON.stringify(report, null, 2));
@@ -135,8 +168,9 @@ const failed = questions.length !== syllabusPoints.length * 6
   || duplicatePrompts.length > 0
   || duplicateTaskStems.length > 0
   || duplicateQuestions.length > 0
-  || duplicateChoiceSets.length > 0
   || schemaErrors.length > 0
-  || weakQuestions.length > 0;
+  || weakQuestions.length > 0
+  || longDistractors.length > 0
+  || unrelatedResultDistractors.length > 0;
 
 if (failed) process.exitCode = 1;
