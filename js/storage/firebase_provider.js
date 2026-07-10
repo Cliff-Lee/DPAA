@@ -24,6 +24,9 @@ import {
 
 import { firebaseConfig } from "./firebase_config.js";
 
+const PUBLIC_DEMO_CLASS_CODE = "PUBLIC-DEMO";
+const PUBLIC_DEMO_SESSION_KEY = "AA_PUBLIC_DEMO";
+
 const state = {
   app: null,
   auth: null,
@@ -36,6 +39,7 @@ const state = {
   teacherVerified: false,
   teacherProfile: null,
   studentProfile: null,
+  publicDemo: sessionStorage.getItem(PUBLIC_DEMO_SESSION_KEY) === "1",
   attempts: [],
   classes: {},
   loadedClasses: new Set(),
@@ -77,8 +81,15 @@ function publicUser() {
     email: state.user.email,
     displayName: state.user.displayName,
     isAnonymous: Boolean(state.user.isAnonymous),
-    isTeacher: Boolean(state.teacherVerified && !state.user.isAnonymous)
+    isTeacher: Boolean(state.teacherVerified && !state.user.isAnonymous),
+    isPublicDemo: Boolean(state.publicDemo && state.user.isAnonymous)
   };
+}
+
+function setPublicDemo(isActive) {
+  state.publicDemo = Boolean(isActive);
+  if (state.publicDemo) sessionStorage.setItem(PUBLIC_DEMO_SESSION_KEY, "1");
+  else sessionStorage.removeItem(PUBLIC_DEMO_SESSION_KEY);
 }
 
 function ensureClassCache(classCode, data = {}) {
@@ -267,9 +278,15 @@ async function initializeFirebase() {
       let firstRun = true;
       onAuthStateChanged(state.auth, (user) => {
         state.user = user || null;
-        if (!user || user.isAnonymous) {
+        if (!user) {
+          setPublicDemo(false);
           state.teacherVerified = false;
           state.teacherProfile = null;
+        } else if (user.isAnonymous) {
+          state.teacherVerified = false;
+          state.teacherProfile = null;
+        } else {
+          setPublicDemo(false);
         }
         emit("aa-auth-changed", { user: publicUser() });
         if (firstRun) {
@@ -320,12 +337,69 @@ async function ensureAnonymousStudent() {
   return credential.user;
 }
 
+async function ensurePublicDemoClass() {
+  const demoRef = classRef(PUBLIC_DEMO_CLASS_CODE);
+  const demoSnap = await getDoc(demoRef);
+  if (demoSnap.exists()) return demoSnap.data();
+
+  const payload = {
+    name: "Today’s public demo",
+    teacherUid: PUBLIC_DEMO_CLASS_CODE,
+    isPublicDemo: true,
+    createdAt: serverTimestamp()
+  };
+  try {
+    await setDoc(demoRef, payload);
+  } catch (error) {
+    // Another visitor may have created the singleton demo between our read and
+    // write. Re-read it before treating the denied update as a real failure.
+    const concurrentDemoSnap = await getDoc(demoRef);
+    if (concurrentDemoSnap.exists()) return concurrentDemoSnap.data();
+    throw error;
+  }
+  return payload;
+}
+
+async function loadPublicDemoData() {
+  await waitForAuthReady();
+  if (!state.user?.isAnonymous || !state.publicDemo) {
+    throw new Error("Start the public demo before loading its activity.");
+  }
+
+  const classData = await ensurePublicDemoClass();
+  state.attempts = [];
+  state.classes = {};
+  state.loadedClasses.clear();
+  ensureClassCache(PUBLIC_DEMO_CLASS_CODE, classData);
+  await loadClassRosterAndAttempts(PUBLIC_DEMO_CLASS_CODE, {
+    force: true,
+    classData
+  });
+  return getAttempts();
+}
+
+async function signInPublicDemo() {
+  await waitForAuthReady();
+  if (state.user && !state.user.isAnonymous) await signOut(state.auth);
+  await ensureAnonymousStudent();
+  setPublicDemo(true);
+  await loadPublicDemoData();
+  emit("aa-auth-changed", { user: publicUser() });
+  return publicUser();
+}
+
 async function getClassByCode(classCode) {
   await initFirebase();
   await ensureAnonymousStudent();
 
   const originalClassCode = classCode;
   const cleanClassCode = String(classCode || "").trim();
+
+  if (cleanClassCode === PUBLIC_DEMO_CLASS_CODE) {
+    setPublicDemo(true);
+    const demoData = await ensurePublicDemoClass();
+    return { id: PUBLIC_DEMO_CLASS_CODE, ...demoData };
+  }
 
   console.log("Original entered class code:", originalClassCode);
   console.log("Checking class code:", cleanClassCode);
@@ -381,6 +455,8 @@ async function joinStudentClass(classCode, nickname, courseLevel, knownClassData
     throw new Error("Class code not found. Check spelling, hyphens and capitals.");
   }
   console.log("Class found");
+
+  if (targetClass === PUBLIC_DEMO_CLASS_CODE) setPublicDemo(true);
 
   const user = state.auth.currentUser;
   ensureClassCache(targetClass, classData);
@@ -563,7 +639,11 @@ async function loadClassData(classCode) {
   const promise = (async () => {
     await waitForAuthReady();
     if (state.user?.isAnonymous) {
-      await loadCurrentStudentClass(target);
+      if (state.publicDemo && target === PUBLIC_DEMO_CLASS_CODE) {
+        await loadClassRosterAndAttempts(target);
+      } else {
+        await loadCurrentStudentClass(target);
+      }
       return;
     }
     if (state.teacherVerified) {
@@ -595,6 +675,10 @@ async function verifyTeacher() {
 }
 
 async function getTeacherClasses() {
+  if (state.publicDemo && state.user?.isAnonymous) {
+    const classData = await ensurePublicDemoClass();
+    return [{ classCode: PUBLIC_DEMO_CLASS_CODE, data: classData }];
+  }
   await verifyTeacher();
   const teacherUid = getCurrentTeacherUid();
   const q = query(
@@ -675,6 +759,7 @@ async function createTeacherClass({ name, classCode }) {
 async function signInTeacher(email, password) {
   await waitForAuthReady();
   if (!email || !password) throw new Error("Enter the teacher email and password.");
+  setPublicDemo(false);
   if (state.user?.isAnonymous) {
     await signOut(state.auth);
   }
@@ -690,6 +775,9 @@ async function signInTeacher(email, password) {
 }
 
 async function loadAllDataForTeacher() {
+  if (state.publicDemo && state.user?.isAnonymous) {
+    return loadPublicDemoData();
+  }
   const teacherClasses = await getTeacherClasses();
   state.attempts = [];
   state.classes = {};
@@ -739,6 +827,7 @@ async function signOutTeacher() {
   state.user = null;
   state.teacherVerified = false;
   state.teacherProfile = null;
+  setPublicDemo(false);
   state.attempts = [];
   state.classes = {};
   state.loadedClasses.clear();
@@ -824,12 +913,14 @@ export const AAFirebaseProvider = {
   createTeacherClass,
   clearClassData,
   signInTeacher,
+  signInPublicDemo,
   signOutTeacher,
   getAuthUser: publicUser,
   getClasses,
   isReady: () => state.ready,
   getError: () => state.initError,
-  hasConfig: hasFirebaseConfig
+  hasConfig: hasFirebaseConfig,
+  publicDemoClassCode: PUBLIC_DEMO_CLASS_CODE
 };
 
 window.AAFirebaseProvider = AAFirebaseProvider;
