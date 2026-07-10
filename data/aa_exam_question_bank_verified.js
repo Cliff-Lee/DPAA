@@ -329,7 +329,7 @@
       t("Evaluate \\(\\displaystyle\\int \\sec^2(3x)\\,dx\\).", "\\(\\int\\sec^2(3x)dx=\\frac13\\tan(3x)+C\\).", "Award marks for advanced trig integral.")
     ],
     "AA-AHL-5.16": [
-      t("Evaluate \\(\\displaystyle\\int 2x\\cos(x^2)\\,dx\\).", "Let \\(u=x^2\\). Then \\(du=2x\\,dx\\), so the integral is \\(\\sin(x^2)+C\\).", "Award marks for substitution."),
+      t("Evaluate \\(\\displaystyle\\int 3x^2e^{x^3}\\,dx\\).", "Let \\(u=x^3\\). Then \\(du=3x^2\\,dx\\), so the integral is \\(e^{x^3}+C\\).", "Award marks for a valid substitution, transformed integral and constant of integration."),
       t("Evaluate \\(\\displaystyle\\int xe^x\\,dx\\).", "Using integration by parts with \\(u=x\\), \\(dv=e^x dx\\), the integral is \\(xe^x-e^x+C=e^x(x-1)+C\\).", "Award marks for integration by parts.")
     ],
     "AA-AHL-5.17": [
@@ -369,32 +369,179 @@
     if (!pointTasks) {
       throw new Error(`Missing verified task blueprint for ${point.id}`);
     }
-    return pointTasks[index % pointTasks.length];
+    const normalizedIndex = ((index % pointTasks.length) + pointTasks.length) % pointTasks.length;
+    return pointTasks[normalizedIndex];
   }
 
+  function skillFor(point, index = 0) {
+    const skills = point.skills?.length ? point.skills : [point.shortLabel || point.label];
+    return skills[((index % skills.length) + skills.length) % skills.length];
+  }
+
+  function skillReference(point, index = 0) {
+    return `the skill "${skillFor(point, index)}"`;
+  }
+
+  const sectionAProfiles = [
+    {
+      paperStyle: "Paper 1",
+      commandTerm: "determine",
+      lead: (task) => `${task.promptLatex} Show all essential working.`,
+      solution: (task) => task.workedSolutionLatex,
+      markscheme: (task) => task.markschemeLatex,
+      followUp: "State one mathematical check that confirms your result is reasonable.",
+      followUpSolution: (point) => `A valid check must use the definitions, restrictions or expected behaviour of ${point.shortLabel.toLowerCase()}.`,
+      followUpMarkscheme: "Award 1 mark for a specific check applied to the obtained result."
+    },
+    {
+      paperStyle: "Paper 2",
+      commandTerm: "calculate",
+      lead: (task, point, index) => `State the relationship involving ${skillReference(point, index)} that you will use. Hence, ${task.promptLatex.charAt(0).toLowerCase()}${task.promptLatex.slice(1)}`,
+      solution: (task, point, index) => `Identify ${skillReference(point, index)} as the governing relationship. ${task.workedSolutionLatex}`,
+      markscheme: (task, point, index) => `Award a method mark for selecting ${skillReference(point, index)}. ${task.markschemeLatex}`,
+      followUp: "Explain why the selected relationship is applicable to the given information.",
+      followUpSolution: (point, index) => `The relationship is applicable because the stated information satisfies the conditions for ${skillReference(point, index)}.`,
+      followUpMarkscheme: "Award 1 mark for linking the method to the supplied data rather than merely naming a formula."
+    },
+    {
+      paperStyle: "Paper 1",
+      commandTerm: "verify",
+      lead: (task) => `An answer to the following task must be checked independently: ${task.promptLatex} Obtain the result and verify it by substitution, estimation or an equivalent exact argument.`,
+      solution: (task) => `${task.workedSolutionLatex} An independent verification should reproduce the result and respect every stated restriction.`,
+      markscheme: (task) => `${task.markschemeLatex} Reserve one method mark for a valid independent verification.`,
+      followUp: "Identify one plausible error that the verification would detect.",
+      followUpSolution: () => "A valid response identifies an error such as a sign, scale, domain, endpoint, unit or rounding error that is relevant to this calculation.",
+      followUpMarkscheme: "Award 1 mark for a plausible error explicitly connected to the verification."
+    },
+    {
+      paperStyle: "Paper 2",
+      commandTerm: "evaluate",
+      lead: (task) => `${task.promptLatex} Retain exact values throughout and, where a decimal answer is meaningful, also give it correct to three significant figures.`,
+      solution: (task) => `${task.workedSolutionLatex} Keep the exact form until the final line; any decimal form should then be rounded to three significant figures.`,
+      markscheme: (task) => `${task.markschemeLatex} Accept an exact form and a consistently rounded three-significant-figure value where applicable.`,
+      followUp: "Comment on whether the exact or approximate form is more useful in this question.",
+      followUpSolution: () => "An exact form preserves mathematical structure; an approximation is useful for interpretation or comparison when a numerical value is required.",
+      followUpMarkscheme: "Award 1 mark for a justified comment about exactness or numerical accuracy."
+    },
+    {
+      paperStyle: "Paper 1",
+      commandTerm: "analyse",
+      lead: (task) => `${task.promptLatex} After solving, describe how the method would be adapted if one numerical input were increased by \(5\%\); a second full calculation is not required.`,
+      solution: (task) => `${task.workedSolutionLatex} For a 5% increase, replace the chosen input by \(1.05\) times its original value and repeat the same valid method, checking whether the relationship is linear or non-linear.`,
+      markscheme: (task) => `${task.markschemeLatex} Award a method mark for a correct 5% multiplier and a valid description of the recalculation.`,
+      followUp: "State one reason why a 5% change in an input need not produce a 5% change in the output.",
+      followUpSolution: () => "The relationship may involve powers, logarithms, trigonometric functions, probability constraints or another non-linear operation.",
+      followUpMarkscheme: "Award 1 mark for identifying a relevant non-linear or constrained relationship."
+    }
+  ];
+
   function sectionA(point, index) {
-    const task = taskFor(point, index);
-    const paperStyle = index % 2 === 0 ? "Paper 1" : "Paper 2";
+    const profileIndex = Math.floor(index / 2);
+    const profile = sectionAProfiles[profileIndex];
+    const task = taskFor(point, profileIndex);
+    const paperStyle = profile.paperStyle;
     const marks = paperStyle === "Paper 1" ? 5 : 6;
     return {
       examSection: "Section A",
       paperStyle,
       calculator: paperStyle === "Paper 1" ? "not_allowed" : "gdc_useful",
       totalMarks: marks,
-      commandTerm: index % 2 === 0 ? "determine" : "calculate",
+      commandTerm: profile.commandTerm,
       estimatedTimeMinutes: marks + 2,
-      promptLatex: `This short-response question assesses ${point.shortLabel.toLowerCase()}.`,
+      promptLatex: `This ${["direct", "method-selection", "verification", "precision", "sensitivity"][profileIndex]} short-response question assesses ${point.shortLabel.toLowerCase()}.`,
       parts: [
-        makePart("a", task.promptLatex, marks - 1, task.markschemeLatex, task.workedSolutionLatex),
-        makePart("b", "State one check, restriction or interpretation that should be considered.", 1, "Award 1 mark for a valid check linked to the syllabus point.", `A suitable check is linked to ${point.description.toLowerCase()}`)
+        makePart(
+          "a",
+          profile.lead(task, point, profileIndex),
+          marks - 1,
+          profile.markscheme(task, point, profileIndex),
+          profile.solution(task, point, profileIndex)
+        ),
+        makePart(
+          "b",
+          profile.followUp,
+          1,
+          profile.followUpMarkscheme,
+          profile.followUpSolution(point, profileIndex)
+        )
       ]
     };
   }
 
+  const sectionBProfiles = [
+    {
+      name: "linked stages",
+      paperStyle: "Paper 2",
+      commandTerm: "solve",
+      firstLead: "Complete the first stage of the analysis:",
+      bridge: (point, index) => `Explain how ${skillReference(point, index)} organizes the information from part (a) for use later in the problem.`,
+      bridgeSolution: (point, index) => `The result should be retained with its restrictions and then used through ${skillReference(point, index)} in the next stage.`,
+      secondLead: "Now complete a related second stage:",
+      conclusion: "Use both results to state a coherent final conclusion, with appropriate accuracy.",
+      conclusionSolution: "Bring the two results together, preserve units or restrictions, and round only the final numerical conclusion.",
+      evaluation: "State one assumption or restriction on which the combined conclusion depends.",
+      evaluationSolution: (point) => `The assumption or restriction must be relevant to ${point.description.toLowerCase()}`
+    },
+    {
+      name: "error analysis",
+      paperStyle: "Paper 1",
+      commandTerm: "justify",
+      firstLead: "Solve this component before assessing a proposed method:",
+      bridge: (point, index) => `A student uses a method unrelated to ${skillReference(point, index)}. Explain why that approach may fail and give the correct governing idea.`,
+      bridgeSolution: (point, index) => `The method must match the structure and restrictions of ${skillReference(point, index)}; an unrelated formula does not use the supplied information correctly.`,
+      secondLead: "Use the corrected approach on this related component:",
+      conclusion: "Compare the two pieces of working and identify one consistency check between them.",
+      conclusionSolution: "A valid comparison checks sign, magnitude, units, domain, endpoints or an equivalent structural feature shared by the results.",
+      evaluation: "Identify the most consequential error that could remain after the comparison.",
+      evaluationSolution: () => "A valid response identifies a relevant unresolved algebraic, arithmetic, domain or interpretation error."
+    },
+    {
+      name: "technology validation",
+      paperStyle: "Paper 2",
+      commandTerm: "validate",
+      firstLead: "Obtain an exact or analytic result for:",
+      bridge: (point, index) => `Describe a suitable calculator, graph, table or numerical procedure for validating the result using ${skillReference(point, index)}.`,
+      bridgeSolution: (point, index) => `Use a correctly configured numerical or graphical representation of ${skillReference(point, index)} and compare it with the analytic result.`,
+      secondLead: "Apply the validated method to the following second case:",
+      conclusion: "Report the final outputs using appropriate precision and explain any discrepancy between exact and technological results.",
+      conclusionSolution: "Technology should agree up to rounding; discrepancies should be traced to settings, premature rounding or model input.",
+      evaluation: "State one limitation of relying only on technology for this problem.",
+      evaluationSolution: () => "Technology can conceal domain restrictions, exact structure, invalid input, unsuitable windows or numerical approximation error."
+    },
+    {
+      name: "comparative reasoning",
+      paperStyle: "Paper 1",
+      commandTerm: "compare",
+      firstLead: "Establish the first result:",
+      bridge: (point, index) => `Before finding the second result, predict one way in which its mathematical structure will differ under ${skillReference(point, index + 1)}.`,
+      bridgeSolution: (point, index) => `The prediction should refer to a feature of ${skillReference(point, index + 1)}, such as sign, scale, domain, representation or rate of change.`,
+      secondLead: "Establish the comparison result:",
+      conclusion: "Compare the methods rather than only the final values, identifying one shared step and one different step.",
+      conclusionSolution: "The comparison must name a mathematically meaningful common step and a distinction caused by the data or required representation.",
+      evaluation: "Decide which method is more efficient for its assigned component and justify your choice.",
+      evaluationSolution: () => "Efficiency should be justified by the amount of working, exactness, reliability or suitability of the available information."
+    },
+    {
+      name: "sensitivity and synthesis",
+      paperStyle: "Paper 2",
+      commandTerm: "analyse",
+      firstLead: "Build the baseline result from:",
+      bridge: (point, index) => `Select one numerical input and explain how a \(10\%\) increase would be represented before recalculating with ${skillReference(point, index)}.`,
+      bridgeSolution: (point, index) => `Replace the selected input by \(1.10\) times its original value, retain the structure of ${skillReference(point, index)}, and state all unchanged assumptions.`,
+      secondLead: "Use this second result to inform the sensitivity analysis:",
+      conclusion: "Synthesize the two results and predict whether the 10% input change would have a smaller, equal or larger proportional effect on the final output.",
+      conclusionSolution: "The prediction must be based on whether the governing relationship is linear, multiplicative, bounded or otherwise non-linear.",
+      evaluation: "State what further calculation or data would be required to test the sensitivity prediction.",
+      evaluationSolution: () => "Recalculate with the modified input, hold other assumptions fixed, and compare relative rather than only absolute change."
+    }
+  ];
+
   function sectionB(point, index) {
-    const first = taskFor(point, index);
-    const second = taskFor(point, index + 1);
-    const paperStyle = index % 2 === 0 ? "Paper 1" : "Paper 2";
+    const profileIndex = Math.floor(index / 2);
+    const profile = sectionBProfiles[profileIndex];
+    const first = taskFor(point, profileIndex);
+    const second = taskFor(point, profileIndex + 1);
+    const paperStyle = profile.paperStyle;
     const totalMarks = paperStyle === "Paper 1" ? 16 : 18;
     const partMarks = paperStyle === "Paper 1" ? [4, 3, 4, 3, 2] : [4, 4, 4, 3, 3];
     return {
@@ -402,37 +549,48 @@
       paperStyle,
       calculator: paperStyle === "Paper 1" ? "not_allowed" : "technology_required",
       totalMarks,
-      commandTerm: "solve",
+      commandTerm: profile.commandTerm,
       estimatedTimeMinutes: totalMarks + 4,
-      promptLatex: `A connected extended-response question based on ${point.label.toLowerCase()}.`,
+      promptLatex: `This ${profile.name} extended-response question develops ${point.label.toLowerCase()} through connected stages.`,
       parts: [
-        makePart("a", first.promptLatex, partMarks[0], first.markschemeLatex, first.workedSolutionLatex),
-        makePart("b", "Explain the key mathematical idea used in part (a), using appropriate notation.", partMarks[1], `Award marks for a clear explanation linked to ${point.skills[0]}.`, `The key idea is to use ${point.skills[0]} within the restrictions of ${point.shortLabel}.`),
-        makePart("c", second.promptLatex, partMarks[2], second.markschemeLatex, second.workedSolutionLatex),
-        makePart("d", "Use your previous results to write a final conclusion for the question.", partMarks[3], "Award marks for consistent use of earlier results and a clear conclusion.", "Combine the results from the earlier parts and state the conclusion with appropriate accuracy."),
-        makePart("e", "State one limitation, restriction or contextual assumption.", partMarks[4], "Award marks for a relevant limitation or restriction.", `A valid comment should refer to ${point.description.toLowerCase()}`)
+        makePart("a", `${profile.firstLead} ${first.promptLatex}`, partMarks[0], first.markschemeLatex, first.workedSolutionLatex),
+        makePart("b", profile.bridge(point, profileIndex), partMarks[1], `Award marks for a clear, relevant response involving ${skillReference(point, profileIndex)}.`, profile.bridgeSolution(point, profileIndex)),
+        makePart("c", `${profile.secondLead} ${second.promptLatex}`, partMarks[2], second.markschemeLatex, second.workedSolutionLatex),
+        makePart("d", profile.conclusion, partMarks[3], "Award marks for consistent use of previous results and a justified conclusion.", profile.conclusionSolution),
+        makePart("e", profile.evaluation, partMarks[4], "Award marks for a specific evaluation linked to the mathematics in the question.", profile.evaluationSolution(point, profileIndex))
       ]
     };
   }
 
   function paper3(point, index) {
-    const first = taskFor(point, index);
-    const second = taskFor(point, index + 1);
+    const isEvaluationStudy = index === 9;
+    const first = taskFor(point, isEvaluationStudy ? 1 : 0);
+    const second = taskFor(point, isEvaluationStudy ? 0 : 1);
+    const partMarks = isEvaluationStudy ? [5, 5, 5, 5, 5, 5] : [4, 5, 5, 5, 5, 4];
     return {
       examSection: "Paper 3",
       paperStyle: "Paper 3",
       calculator: "technology_required",
-      totalMarks: 28,
-      commandTerm: "investigate",
-      estimatedTimeMinutes: 38,
-      promptLatex: `This extended HL Paper 3-style problem investigates ${point.label.toLowerCase()} in a multi-stage context.`,
-      parts: [
-        makePart("a", first.promptLatex, 5, first.markschemeLatex, first.workedSolutionLatex),
-        makePart("b", "Generalize the method from part (a), defining any parameter restrictions clearly.", 5, `Award marks for a valid generalization connected to ${point.skills[0]}.`, `A valid generalization keeps the structure of ${point.shortLabel} and states necessary restrictions.`),
-        makePart("c", second.promptLatex, 5, second.markschemeLatex, second.workedSolutionLatex),
-        makePart("d", "Use technology or exact reasoning to compare two cases of the model or result.", 5, "Award marks for a valid comparison with interpreted output.", "Compare the cases consistently and explain the mathematical meaning of the comparison."),
-        makePart("e", "Use the results above to make a final prediction, proof conclusion or evaluation.", 4, "Award marks for a reasoned final statement using previous results.", "Use the previous parts to support a final conclusion."),
-        makePart("f", "State one limitation of the model, proof strategy or computational method.", 4, "Award marks for a relevant limitation linked to assumptions, domain, accuracy or method.", `A limitation should connect to ${point.description.toLowerCase()}`)
+      totalMarks: partMarks.reduce((sum, marks) => sum + marks, 0),
+      commandTerm: isEvaluationStudy ? "evaluate" : "investigate",
+      estimatedTimeMinutes: isEvaluationStudy ? 40 : 38,
+      promptLatex: isEvaluationStudy
+        ? `This HL Paper 3 evaluation study tests the robustness of methods for ${point.label.toLowerCase()} under changed assumptions.`
+        : `This HL Paper 3 investigation develops and tests a general model for ${point.label.toLowerCase()}.`,
+      parts: isEvaluationStudy ? [
+        makePart("a", `Establish a comparison case: ${first.promptLatex}`, partMarks[0], first.markschemeLatex, first.workedSolutionLatex),
+        makePart("b", `Audit the method in part (a), identifying one hidden restriction connected to ${skillReference(point, 1)}.`, partMarks[1], "Award marks for identifying, explaining and applying a genuine restriction.", `The restriction must arise from ${skillReference(point, 1)} and must be applied to the result from part (a).`),
+        makePart("c", `Establish an alternative case: ${second.promptLatex}`, partMarks[2], second.markschemeLatex, second.workedSolutionLatex),
+        makePart("d", "Use technology to perturb one numerical input by \(10\%\) and describe the resulting change in output.", partMarks[3], "Award marks for a 1.10 input multiplier, correct technological procedure and interpreted output.", "Replace one input by 1.10 times its original value, recompute consistently and compare relative output change."),
+        makePart("e", "Decide which of the two methods is more robust under the perturbation, supporting the decision with mathematical evidence.", partMarks[4], "Award marks for a justified comparison based on the preceding results.", "Robustness should be judged from sensitivity, restrictions, numerical stability and suitability of the method."),
+        makePart("f", "Evaluate one limitation of the investigation and propose one mathematically useful extension.", partMarks[5], "Award marks for a relevant limitation and a feasible extension.", `A strong response links both comments to ${point.description.toLowerCase()}`)
+      ] : [
+        makePart("a", `Establish the initial case: ${first.promptLatex}`, partMarks[0], first.markschemeLatex, first.workedSolutionLatex),
+        makePart("b", "Generalize the method from part (a), defining parameters and all necessary restrictions.", partMarks[1], `Award marks for a valid generalization connected to ${skillReference(point, 0)}.`, `Preserve the structure of ${point.shortLabel.toLowerCase()}, define each parameter and state its domain.`),
+        makePart("c", `Test the general method on a contrasting case: ${second.promptLatex}`, partMarks[2], second.markschemeLatex, second.workedSolutionLatex),
+        makePart("d", "Use technology or exact reasoning to compare the initial and contrasting cases over an appropriate domain.", partMarks[3], "Award marks for a valid comparison, appropriate domain and interpreted output.", "Use consistent definitions and explain the mathematical meaning of similarities, differences and boundary behaviour."),
+        makePart("e", "Use the comparison to formulate and justify a conjecture, prediction or general conclusion.", partMarks[4], "Award marks for a clear statement supported by results from earlier parts.", "The conclusion must follow from the computed cases and the generalized structure, with counterconditions noted where relevant."),
+        makePart("f", "State one limitation of the model or proof strategy and identify the evidence needed to address it.", partMarks[5], "Award marks for a relevant limitation and a specific evidence requirement.", `The limitation and evidence should connect to ${point.description.toLowerCase()}`)
       ]
     };
   }
