@@ -21,7 +21,7 @@
     });
     AA_UI.byId("exportCsvButton").addEventListener("click", exportCSV);
     AA_UI.byId("resetDashboardButton").addEventListener("click", resetData);
-    AA_UI.byId("teacherSignInButton")?.addEventListener("click", signInTeacher);
+    AA_UI.byId("teacherLoginForm")?.addEventListener("submit", signInTeacher);
     AA_UI.byId("teacherSignOutButton")?.addEventListener("click", signOutTeacher);
   }
 
@@ -61,12 +61,16 @@
 
   function configureStorageMode() {
     const authPanel = AA_UI.byId("teacherAuthPanel");
+    const loginForm = AA_UI.byId("teacherLoginForm");
     const signInButton = AA_UI.byId("teacherSignInButton");
     const signOutButton = AA_UI.byId("teacherSignOutButton");
+    const signedInActions = AA_UI.byId("teacherSignedInActions");
     const resetButton = AA_UI.byId("resetDashboardButton");
 
     if (!isFirebaseMode()) {
       authPanel?.classList.add("hidden");
+      loginForm?.classList.add("hidden");
+      signedInActions?.classList.add("hidden");
       setDashboardContentVisible(true);
       if (resetButton) resetButton.textContent = "Reset local data";
       renderDashboard();
@@ -78,29 +82,34 @@
 
     if (!AAStorage.hasConfig?.()) {
       setDashboardContentVisible(false);
-      signInButton.disabled = true;
+      if (signInButton) signInButton.disabled = true;
+      loginForm?.classList.remove("hidden");
       signOutButton?.classList.add("hidden");
-      setAuthStatus("Firebase mode is active, but the Firebase web app config is missing.", true);
+      signedInActions?.classList.add("hidden");
+      const storageError = AAStorage.getError?.();
+      setAuthStatus(storageError?.message || "Firebase mode is active, but the Firebase provider did not load.", true);
       return;
     }
 
-    signInButton.disabled = false;
+    if (signInButton) signInButton.disabled = false;
     const user = AAStorage.getAuthUser?.();
-    if (!user) {
+    if (!user || user.isAnonymous) {
       setDashboardContentVisible(false);
-      signInButton.classList.remove("hidden");
+      loginForm?.classList.remove("hidden");
       signOutButton?.classList.add("hidden");
-      setAuthStatus("Sign in with a teacher Google account to load Firebase class data.");
+      signedInActions?.classList.add("hidden");
+      setAuthStatus("Sign in with your teacher email and password to load Firebase class data.");
       return;
     }
 
-    signInButton.classList.add("hidden");
+    loginForm?.classList.add("hidden");
     signOutButton?.classList.remove("hidden");
-    setAuthStatus(`Signed in as ${user.email || user.displayName || "teacher"}. Loading class data...`);
+    signedInActions?.classList.remove("hidden");
+    setAuthStatus(`Signed in as ${user.email || "teacher"}. Loading class data...`);
     setDashboardContentVisible(true);
     AAStorage.loadAllDataForTeacher?.()
       .then(() => {
-        setAuthStatus(`Signed in as ${user.email || user.displayName || "teacher"}.`);
+        setAuthStatus(`Signed in as ${user.email || "teacher"}.`);
         renderDashboard();
       })
       .catch((error) => {
@@ -109,14 +118,26 @@
       });
   }
 
-  async function signInTeacher() {
+  async function signInTeacher(event) {
+    event?.preventDefault();
     if (!AAStorage.signInTeacher) return;
-    setAuthStatus("Opening Google sign-in...");
+    const email = AA_UI.byId("teacherEmail").value.trim();
+    const password = AA_UI.byId("teacherPassword").value;
+    if (!email || !password) {
+      setAuthStatus("Enter the teacher email and password.", true);
+      return;
+    }
+
+    const signInButton = AA_UI.byId("teacherSignInButton");
+    if (signInButton) signInButton.disabled = true;
+    setAuthStatus("Signing in...");
     try {
-      await AAStorage.signInTeacher();
+      await AAStorage.signInTeacher(email, password);
       configureStorageMode();
     } catch (error) {
       setAuthStatus(error.message || "Teacher sign-in failed.", true);
+    } finally {
+      if (signInButton) signInButton.disabled = false;
     }
   }
 
@@ -333,5 +354,9 @@
     renderDashboard();
   }
 
-  document.addEventListener("DOMContentLoaded", init);
+  if (window.AAApp?.ready) {
+    window.AAApp.ready(init);
+  } else {
+    document.addEventListener("DOMContentLoaded", init);
+  }
 })();

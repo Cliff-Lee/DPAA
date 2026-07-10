@@ -225,7 +225,7 @@
     return pool.length ? pool : allQuestions;
   }
 
-  function startPractice(event) {
+  async function startPractice(event) {
     event.preventDefault();
     const profile = {
       classCode: AA_UI.byId("classCode").value.trim().toUpperCase(),
@@ -242,6 +242,20 @@
       return;
     }
 
+    const submitButton = event.submitter;
+    if (submitButton) submitButton.disabled = true;
+    showSetupMessage(window.AAStorageMode === "firebase" ? "Connecting to Firebase class..." : "Building your practice set...");
+    try {
+      if (AAStorage.joinStudentClass) {
+        await AAStorage.joinStudentClass(profile.classCode, profile.nickname, profile.courseLevel);
+      }
+    } catch (error) {
+      showSetupMessage(error.message || "Could not join that class.");
+      if (submitButton) submitButton.disabled = false;
+      return;
+    }
+    if (submitButton) submitButton.disabled = false;
+
     const pool = buildQuestionPool(profile);
     if (!pool.length) {
       showSetupMessage("No questions match those settings yet. Try a broader mode or select AA HL for Paper 3.");
@@ -256,6 +270,7 @@
     AA_UI.byId("setupPanel").classList.add("hidden");
     AA_UI.byId("resultsPanel").classList.add("hidden");
     AA_UI.byId("practicePanel").classList.remove("hidden");
+    AA_UI.byId("setupMessage").classList.add("hidden");
     showQuestion();
   }
 
@@ -433,5 +448,9 @@
     `;
   }
 
-  document.addEventListener("DOMContentLoaded", init);
+  if (window.AAApp?.ready) {
+    window.AAApp.ready(init);
+  } else {
+    document.addEventListener("DOMContentLoaded", init);
+  }
 })();

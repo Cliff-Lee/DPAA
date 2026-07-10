@@ -5,7 +5,7 @@
     const status = document.getElementById("resetStatus");
     resetButton?.addEventListener("click", () => {
       if (!window.confirm("Reset all locally saved AA demo attempts on this browser?")) return;
-      window.AALocalStorageProvider.clearAllData();
+      window.AAStorageManager.clearLocalDemoData();
       status.textContent = "Local demo data reset.";
       setTimeout(() => {
         status.textContent = "";
@@ -68,5 +68,9 @@
     `;
   }
 
-  document.addEventListener("DOMContentLoaded", init);
+  if (window.AAApp?.ready) {
+    window.AAApp.ready(init);
+  } else {
+    document.addEventListener("DOMContentLoaded", init);
+  }
 })();
