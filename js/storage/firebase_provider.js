@@ -666,7 +666,7 @@ async function createTeacherClass({ name, classCode }) {
   } catch (error) {
     console.error("createTeacherClass failed:", error.code, error.message, error);
     if (error.code === "permission-denied") {
-      throw new Error(`Firestore denied creating classes/${cleanClassCode}. Try a brand-new class code. If that also fails, update the classes create rule to allow name, teacherUid and createdAt for this teacher.`);
+      throw new Error(`Firestore rules denied creating classes/${cleanClassCode}. Deploy the project's firestore.rules file, then try again.`);
     }
     throw error;
   }
