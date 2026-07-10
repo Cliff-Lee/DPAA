@@ -16,7 +16,7 @@
   }
 
   function normalizeClassCode(classCode) {
-    return String(classCode || "").trim().toUpperCase();
+    return String(classCode || "").trim();
   }
 
   function normalizeNickname(nickname) {

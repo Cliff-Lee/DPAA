@@ -308,8 +308,10 @@ async function getClassByCode(classCode) {
   await initFirebase();
   await ensureAnonymousStudent();
 
+  const originalClassCode = classCode;
   const cleanClassCode = String(classCode || "").trim();
 
+  console.log("Original entered class code:", originalClassCode);
   console.log("Checking class code:", cleanClassCode);
   console.log("Checking path:", `classes/${cleanClassCode}`);
   console.log(`Checking classes/${cleanClassCode}`);
