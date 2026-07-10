@@ -20,7 +20,7 @@ exports.resetPublicDemo = onSchedule({
   logger.info("Resetting the shared public demo class.");
   await db.recursiveDelete(demoClassRef);
   await demoClassRef.set({
-    name: "Today’s public demo",
+    name: "Today's public demo",
     teacherUid: PUBLIC_DEMO_CLASS_CODE,
     isPublicDemo: true,
     createdAt: FieldValue.serverTimestamp(),
