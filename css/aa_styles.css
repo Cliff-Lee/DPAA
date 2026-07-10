@@ -424,7 +424,7 @@ a:focus-visible {
 
 .auth-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
   gap: 16px;
   align-items: center;
   margin-bottom: 18px;
@@ -437,6 +437,17 @@ a:focus-visible {
 .auth-error {
   color: var(--red);
   font-weight: 800;
+}
+
+.teacher-login-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+#teacherSignedInActions {
+  justify-self: end;
 }
 
 .test-builder-card {
@@ -1134,6 +1145,8 @@ svg text {
   .filter-grid,
   .practice-layout,
   .dashboard-grid,
+  .auth-card,
+  .teacher-login-form,
   .editor-layout {
     grid-template-columns: 1fr;
   }
