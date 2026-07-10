@@ -27,10 +27,15 @@
     <section id="teacherAuthPanel" class="card auth-card hidden" aria-live="polite">
       <div>
         <p class="eyebrow">Teacher access</p>
-        <h2>Sign in to view Firebase class data</h2>
+        <h2>Explore a live class dashboard</h2>
         <p id="teacherAuthStatus" class="muted">Teacher dashboard access is required when Firebase storage mode is active.</p>
+        <div id="publicDemoEntry" class="public-demo-entry">
+          <button id="tryPublicDemoButton" class="primary-button" type="button">Try the demo</button>
+          <p>See the activity other visitors add to one shared class. Public demo data is visible to everyone and clears daily at midnight (Shanghai time).</p>
+        </div>
       </div>
       <form id="teacherLoginForm" class="teacher-login-form">
+        <p class="premium-login-label">Premium account sign in</p>
         <label>
           <span>Email</span>
           <input id="teacherEmail" type="email" autocomplete="username" placeholder="teacher@example.com">
@@ -48,6 +53,19 @@
       </div>
     </section>
 
+    <section id="publicDemoBanner" class="card public-demo-banner hidden" aria-live="polite">
+      <div>
+        <p class="eyebrow">Shared public demo</p>
+        <h2>You are viewing today’s live demo class</h2>
+        <p>Everyone can see the nicknames and practice activity shown here. The class is automatically cleared every day at midnight (Shanghai time).</p>
+      </div>
+      <div class="public-demo-actions">
+        <a class="primary-button button-link" href="aa_mcq_practice.html?demo=1">Add activity as a student</a>
+        <button id="refreshPublicDemoButton" class="secondary-button" type="button">Refresh activity</button>
+        <button id="switchToPremiumButton" class="secondary-button" type="button">Use a premium account</button>
+      </div>
+    </section>
+
     <section class="card filter-card dashboard-content">
       <div class="filter-grid">
         <label>
@@ -57,7 +75,7 @@
           </select>
         </label>
         <div class="filter-action">
-          <button id="openCreateClassButton" class="primary-button create-class-button" type="button">+ Create class</button>
+          <button id="openCreateClassButton" class="primary-button create-class-button premium-only" type="button">+ Create class</button>
         </div>
         <label>
           <span>Course level</span>
@@ -129,7 +147,7 @@
       </section>
       <div class="button-row">
         <button id="exportCsvButton" class="secondary-button" type="button">Export CSV</button>
-        <button id="resetDashboardButton" class="danger-button" type="button">Reset data</button>
+        <button id="resetDashboardButton" class="danger-button premium-only" type="button">Reset data</button>
       </div>
     </section>
 
