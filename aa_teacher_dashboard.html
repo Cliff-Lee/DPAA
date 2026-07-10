@@ -51,9 +51,14 @@
     <section class="card filter-card dashboard-content">
       <div class="filter-grid">
         <label>
-          <span>Class code</span>
-          <input id="classFilter" autocomplete="off" placeholder="All classes">
+          <span>Class</span>
+          <select id="classFilter">
+            <option value="">All classes</option>
+          </select>
         </label>
+        <div class="filter-action">
+          <button id="openCreateClassButton" class="primary-button create-class-button" type="button">+ Create class</button>
+        </div>
         <label>
           <span>Course level</span>
           <select id="levelFilter">
@@ -92,6 +97,36 @@
           </select>
         </label>
       </div>
+      <section id="createClassPanel" class="create-class-panel hidden" aria-label="Create class">
+        <div>
+          <p class="eyebrow">Class management</p>
+          <h2>Create class</h2>
+        </div>
+        <form id="createClassForm" class="create-class-form">
+          <label>
+            <span>Class name</span>
+            <input id="newClassName" autocomplete="off" placeholder="Grade 11 AA">
+          </label>
+          <label>
+            <span>Class code</span>
+            <input id="newClassCode" autocomplete="off" placeholder="AA2026-Chan">
+          </label>
+          <div class="button-row create-class-actions">
+            <button id="createClassSubmitButton" class="primary-button" type="submit">Create class</button>
+            <button id="cancelCreateClassButton" class="secondary-button" type="button">Cancel</button>
+          </div>
+        </form>
+        <p id="createClassStatus" class="status-line hidden" aria-live="polite"></p>
+      </section>
+      <section class="class-management-area" aria-labelledby="myClassesTitle">
+        <div class="section-heading compact-heading">
+          <div>
+            <h2 id="myClassesTitle">My classes</h2>
+            <p id="classLoadingStatus" class="muted">Loading classes...</p>
+          </div>
+        </div>
+        <div id="myClassesList" class="my-classes-list"></div>
+      </section>
       <div class="button-row">
         <button id="exportCsvButton" class="secondary-button" type="button">Export CSV</button>
         <button id="resetDashboardButton" class="danger-button" type="button">Reset data</button>
