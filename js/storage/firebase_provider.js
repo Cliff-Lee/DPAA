@@ -631,27 +631,37 @@ async function createTeacherClass({ name, classCode }) {
     throw new Error("Class code can only contain letters, numbers, hyphens or underscores.");
   }
 
-  const newClassRef = classRef(cleanClassCode);
-  const existingClass = await getDoc(newClassRef);
-  if (existingClass.exists()) {
-    throw new Error("A class with that code already exists.");
+  const duplicateOwnedClass = getClasses().some((klass) => (
+    String(klass.classCode || klass.id || "").toLowerCase() === cleanClassCode.toLowerCase()
+  ));
+  if (duplicateOwnedClass) {
+    throw new Error("You already have a class with that code.");
   }
 
   const teacherUid = getCurrentTeacherUid();
-  const teacherEmail = state.auth.currentUser?.email || "";
   const payload = {
     name: cleanName,
     teacherUid,
-    teacherEmail,
     createdAt: serverTimestamp()
   };
-  await setDoc(newClassRef, payload);
-  const cached = ensureClassCache(cleanClassCode, {
-    ...payload,
-    createdAt: new Date().toISOString()
-  });
-  emit("aa-storage-updated", { mode: "firebase", classCode: cleanClassCode });
-  return publicClassRecord(cached);
+
+  console.log("Creating class", cleanClassCode, payload);
+  try {
+    await setDoc(classRef(cleanClassCode), payload);
+    console.log("Class created successfully", cleanClassCode);
+    const cached = ensureClassCache(cleanClassCode, {
+      ...payload,
+      createdAt: new Date().toISOString()
+    });
+    emit("aa-storage-updated", { mode: "firebase", classCode: cleanClassCode });
+    return publicClassRecord(cached);
+  } catch (error) {
+    console.error("createTeacherClass failed:", error.code, error.message, error);
+    if (error.code === "permission-denied") {
+      throw new Error("The class code may already be in use, or Firestore is blocking the class write.");
+    }
+    throw error;
+  }
 }
 
 async function signInTeacher(email, password) {
