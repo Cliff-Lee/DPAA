@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AA Question Bank & Test Builder</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/aa_styles.css">
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [["\\(", "\\)"], ["$", "$"]] },
+      svg: { fontCache: "global" }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script defer src="data/aa_syllabus.js"></script>
+  <script defer src="data/aa_exam_question_bank_reconciled.js"></script>
+  <script defer src="data/aa_exam_question_bank_verified.js"></script>
+  <script defer src="js/aa_ui_helpers.js"></script>
+  <script defer src="js/pages/aa_question_editor_page.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="page-header">
+      <a class="back-link" href="aa_index.html">Home</a>
+      <div>
+        <p class="eyebrow">Question bank</p>
+        <h1>AA Exam Test Builder</h1>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>Schema validation</h2>
+      <div id="validationSummary" class="schema-ok"></div>
+    </section>
+
+    <section class="card test-builder-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Exam builder</p>
+          <h2>Create an exam-style test paper</h2>
+        </div>
+        <p class="muted">Use the filters, add questions, then print or save the test with a separate markscheme and worked solutions.</p>
+      </div>
+
+      <div class="test-builder-controls">
+        <label>
+          <span>Test title</span>
+          <input id="testTitle" autocomplete="off" value="IB DP AA Exam-Style Test">
+        </label>
+        <label>
+          <span>Number from filters</span>
+          <input id="testQuestionCount" type="number" min="1" max="30" value="10">
+        </label>
+        <label>
+          <span>Test mode</span>
+          <select id="testMode">
+            <option value="questions-only">Questions only</option>
+            <option value="with-markscheme">Questions + markscheme</option>
+            <option value="solutions-only">Markscheme + worked solutions</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="button-row">
+        <button id="buildFilteredTestButton" class="primary-button" type="button">Build from filters</button>
+        <button id="addSelectedQuestionButton" class="secondary-button" type="button">Add selected question</button>
+        <button id="clearTestButton" class="secondary-button" type="button">Clear test</button>
+        <button id="printTestButton" class="secondary-button" type="button">Print / Save PDF</button>
+        <button id="downloadPaperButton" class="secondary-button" type="button">Download paper</button>
+        <button id="downloadMarkschemeButton" class="secondary-button" type="button">Download markscheme</button>
+        <button id="downloadSolutionsButton" class="secondary-button" type="button">Download worked solutions</button>
+      </div>
+
+      <div class="test-builder-grid">
+        <section>
+          <h3>Test paper box</h3>
+          <div id="selectedTestList" class="selected-test-list drop-zone" aria-label="Selected test questions"></div>
+        </section>
+        <section>
+          <h3>Exam preview</h3>
+          <div id="testPreview" class="test-preview"></div>
+        </section>
+        <section>
+          <h3>Markscheme</h3>
+          <div id="markschemePreview" class="markscheme-preview"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="editor-layout">
+      <aside class="card editor-sidebar">
+        <div class="editor-filters">
+          <label>
+            <span>Search</span>
+            <input id="editorSearch" autocomplete="off" placeholder="ID, tag, prompt">
+          </label>
+          <label>
+            <span>Topic</span>
+            <select id="editorTopicFilter"></select>
+          </label>
+          <label>
+            <span>Syllabus point</span>
+            <select id="editorSyllabusFilter"></select>
+          </label>
+          <label>
+            <span>Level</span>
+            <select id="editorLevelFilter">
+              <option value="all">SL and AHL</option>
+              <option value="SL">SL only</option>
+              <option value="AHL">AHL only</option>
+            </select>
+          </label>
+          <label>
+            <span>Paper style</span>
+            <select id="editorPaperFilter">
+              <option value="all">All papers</option>
+              <option value="Paper 1">Paper 1</option>
+              <option value="Paper 2">Paper 2</option>
+              <option value="Paper 3">Paper 3</option>
+            </select>
+          </label>
+          <label>
+            <span>Paper section</span>
+            <select id="editorSectionFilter">
+              <option value="all">All sections</option>
+              <option value="Section A">Section A short response</option>
+              <option value="Section B">Section B extended response</option>
+              <option value="Paper 3">HL Paper 3 extended</option>
+            </select>
+          </label>
+          <label>
+            <span>Calculator status</span>
+            <select id="editorCalculatorFilter">
+              <option value="all">All statuses</option>
+              <option value="not_allowed">No calculator</option>
+              <option value="gdc_useful">GDC useful</option>
+              <option value="technology_required">Technology required</option>
+            </select>
+          </label>
+          <label>
+            <span>Difficulty</span>
+            <select id="editorDifficultyFilter">
+              <option value="all">All difficulties</option>
+              <option value="1">Difficulty 1</option>
+              <option value="2">Difficulty 2</option>
+              <option value="3">Difficulty 3</option>
+            </select>
+          </label>
+        </div>
+        <div class="question-list-header">
+          <h2>Questions</h2>
+          <span id="questionListCount"></span>
+        </div>
+        <div id="questionList" class="question-list"></div>
+      </aside>
+
+      <section id="questionPreview" class="card question-preview"></section>
+    </section>
+  </main>
+</body>
+</html>

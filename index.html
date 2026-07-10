@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IB DP AA MCQ Bank</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/aa_styles.css">
+  <script defer src="data/aa_syllabus.js"></script>
+  <script defer src="data/aa_question_bank_seed.js"></script>
+  <script defer src="data/aa_mcq_question_bank_reconciled.js"></script>
+  <script defer src="data/aa_exam_question_bank_reconciled.js"></script>
+  <script defer src="data/aa_exam_question_bank_verified.js"></script>
+  <script defer src="js/storage/storage_mode.js"></script>
+  <script defer src="js/storage/storage_interface.js"></script>
+  <script defer src="js/storage/local_storage_provider.js"></script>
+  <script defer src="js/storage/firebase_provider.js"></script>
+  <script defer src="js/storage/storage_provider_selector.js"></script>
+  <script defer src="js/aa_ui_helpers.js"></script>
+  <script defer src="js/pages/aa_index_page.js"></script>
+</head>
+<body>
+  <main class="app-shell landing-shell">
+    <section class="landing-hero">
+      <div>
+        <p class="eyebrow">IB DP Mathematics</p>
+        <h1>Analysis and Approaches MCQ Practice</h1>
+        <p class="hero-copy">Local Phase 1 question bank for AA SL and AA HL, with browser-saved attempts and dashboard analytics.</p>
+      </div>
+      <div class="hero-badges">
+        <span class="meta-label label-sl">AA SL</span>
+        <span class="meta-label label-hl">AA HL</span>
+        <span class="meta-label label-no-calc">Paper 1</span>
+        <span class="meta-label label-tech">Paper 2</span>
+        <span class="meta-label label-ahl">AHL</span>
+      </div>
+    </section>
+
+    <section class="landing-actions" aria-label="Main navigation">
+      <a class="big-action" href="aa_mcq_practice.html">
+        <span>Student MCQ Practice</span>
+        <small>Start a local practice set</small>
+      </a>
+      <a class="big-action" href="aa_teacher_dashboard.html">
+        <span>Teacher Dashboard</span>
+        <small>Read saved local attempts</small>
+      </a>
+      <a class="big-action" href="aa_question_editor.html">
+        <span>Question Bank Viewer</span>
+        <small>Preview and validate questions</small>
+      </a>
+      <button class="big-action danger-action" id="resetLocalDataButton" type="button">
+        <span>Reset Local Demo Data</span>
+        <small>Clear this browser only</small>
+      </button>
+    </section>
+    <p id="resetStatus" class="status-line" aria-live="polite"></p>
+
+    <section class="topic-menu-section" aria-labelledby="topicMenuTitle">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Syllabus menu</p>
+          <h2 id="topicMenuTitle">Browse by topic</h2>
+        </div>
+        <p class="muted">Each syllabus point includes its local description and direct links into practice or the question bank.</p>
+      </div>
+      <div id="topicMenu" class="topic-menu"></div>
+    </section>
+  </main>
+</body>
+</html>

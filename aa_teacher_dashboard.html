@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AA Teacher Dashboard</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/aa_styles.css">
+  <script defer src="data/aa_syllabus.js"></script>
+  <script defer src="js/storage/storage_mode.js"></script>
+  <script defer src="js/storage/storage_interface.js"></script>
+  <script defer src="js/storage/local_storage_provider.js"></script>
+  <script defer src="js/storage/firebase_provider.js"></script>
+  <script defer src="js/storage/storage_provider_selector.js"></script>
+  <script defer src="js/aa_progress_engine.js"></script>
+  <script defer src="js/aa_recommendations.js"></script>
+  <script defer src="js/aa_ui_helpers.js"></script>
+  <script defer src="js/pages/aa_teacher_dashboard_page.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="page-header">
+      <a class="back-link" href="aa_index.html">Home</a>
+      <div>
+        <p class="eyebrow">Teacher dashboard</p>
+        <h1>Local AA Class Progress</h1>
+      </div>
+    </header>
+
+    <section id="teacherAuthPanel" class="card auth-card hidden" aria-live="polite">
+      <div>
+        <p class="eyebrow">Teacher access</p>
+        <h2>Sign in to view Firebase class data</h2>
+        <p id="teacherAuthStatus" class="muted">Teacher dashboard access is required when Firebase storage mode is active.</p>
+      </div>
+      <div class="button-row">
+        <button id="teacherSignInButton" class="primary-button" type="button">Sign in with Google</button>
+        <button id="teacherSignOutButton" class="secondary-button hidden" type="button">Sign out</button>
+      </div>
+    </section>
+
+    <section class="card filter-card dashboard-content">
+      <div class="filter-grid">
+        <label>
+          <span>Class code</span>
+          <input id="classFilter" autocomplete="off" placeholder="All classes">
+        </label>
+        <label>
+          <span>Course level</span>
+          <select id="levelFilter">
+            <option value="all">SL and HL</option>
+            <option value="SL">SL only</option>
+            <option value="HL">HL only</option>
+          </select>
+        </label>
+        <label>
+          <span>Topic</span>
+          <select id="topicFilter"></select>
+        </label>
+        <label>
+          <span>Content level</span>
+          <select id="contentLevelFilter">
+            <option value="all">SL and AHL</option>
+            <option value="SL">SL only</option>
+            <option value="AHL">AHL only</option>
+          </select>
+        </label>
+        <label>
+          <span>Paper</span>
+          <select id="paperFilter">
+            <option value="all">All papers</option>
+            <option value="Paper 1">Paper 1</option>
+            <option value="Paper 2">Paper 2</option>
+            <option value="Paper 3">Paper 3</option>
+          </select>
+        </label>
+        <label>
+          <span>Time</span>
+          <select id="timeFilter">
+            <option value="all">All time</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </label>
+      </div>
+      <div class="button-row">
+        <button id="exportCsvButton" class="secondary-button" type="button">Export CSV</button>
+        <button id="resetDashboardButton" class="danger-button" type="button">Reset data</button>
+      </div>
+    </section>
+
+    <section class="card dashboard-content">
+      <h2>Class overview</h2>
+      <div id="overviewMetrics" class="metric-grid"></div>
+    </section>
+
+    <section class="dashboard-grid dashboard-content">
+      <div class="card">
+        <h2>Weakest topics</h2>
+        <div id="weakestTopics"></div>
+      </div>
+      <div class="card">
+        <h2>Weakest syllabus points</h2>
+        <div id="weakestSyllabus"></div>
+      </div>
+      <div class="card">
+        <h2>Misconception summary</h2>
+        <div id="misconceptionSummary"></div>
+      </div>
+      <div class="card">
+        <h2>Readiness</h2>
+        <div id="readinessCards" class="readiness-grid"></div>
+      </div>
+    </section>
+
+    <section class="card table-card dashboard-content">
+      <h2>Students</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th>Student</th>
+              <th>Level</th>
+              <th>Attempts</th>
+              <th>Accuracy</th>
+              <th>Avg time</th>
+              <th>Mastery</th>
+            </tr>
+          </thead>
+          <tbody id="studentTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card dashboard-content">
+      <h2>Student-by-syllabus heatmap</h2>
+      <div id="heatmap" class="heatmap-wrap"></div>
+    </section>
+  </main>
+</body>
+</html>

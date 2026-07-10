@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AA Student MCQ Practice</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/aa_styles.css">
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [["\\(", "\\)"], ["$", "$"]] },
+      svg: { fontCache: "global" }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script defer src="data/aa_syllabus.js"></script>
+  <script defer src="data/aa_question_bank_seed.js"></script>
+  <script defer src="data/aa_mcq_question_bank_reconciled.js"></script>
+  <script defer src="data/aa_question_generators.js"></script>
+  <script defer src="js/storage/storage_mode.js"></script>
+  <script defer src="js/storage/storage_interface.js"></script>
+  <script defer src="js/storage/local_storage_provider.js"></script>
+  <script defer src="js/storage/firebase_provider.js"></script>
+  <script defer src="js/storage/storage_provider_selector.js"></script>
+  <script defer src="js/aa_progress_engine.js"></script>
+  <script defer src="js/aa_recommendations.js"></script>
+  <script defer src="js/aa_ui_helpers.js"></script>
+  <script defer src="js/pages/aa_practice_page.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="page-header">
+      <a class="back-link" href="aa_index.html">Home</a>
+      <div>
+        <p class="eyebrow">Student practice</p>
+        <h1>AA SL / AA HL MCQ Practice</h1>
+      </div>
+    </header>
+
+    <section id="setupPanel" class="card">
+      <form id="setupForm" class="setup-grid">
+        <label>
+          <span>Class code</span>
+          <input id="classCode" name="classCode" autocomplete="off" placeholder="AA-CLASS">
+        </label>
+        <label>
+          <span>Nickname</span>
+          <input id="nickname" name="nickname" autocomplete="off" placeholder="Student name">
+        </label>
+        <label>
+          <span>Course level</span>
+          <select id="courseLevel" name="courseLevel">
+            <option value="SL">AA SL</option>
+            <option value="HL">AA HL</option>
+          </select>
+        </label>
+        <label>
+          <span>Practice mode</span>
+          <select id="practiceMode" name="practiceMode">
+            <option value="whole">Whole course mixed practice</option>
+            <option value="topic">Topic practice</option>
+            <option value="syllabus">Syllabus point practice</option>
+            <option value="weak">Weak-area practice</option>
+            <option value="paper1">Paper 1 non-calculator practice</option>
+            <option value="paper2">Paper 2 calculator practice</option>
+            <option value="paper3">HL Paper 3 reasoning practice</option>
+          </select>
+        </label>
+        <label id="topicControl" class="hidden">
+          <span>Topic</span>
+          <select id="topicSelect" name="topicSelect"></select>
+        </label>
+        <label id="syllabusControl" class="hidden">
+          <span>Syllabus point</span>
+          <select id="syllabusSelect" name="syllabusSelect"></select>
+        </label>
+        <p id="syllabusDescription" class="syllabus-description hidden"></p>
+        <section id="syllabusPracticePicker" class="syllabus-picker hidden" aria-label="Syllabus point picker">
+          <div class="section-heading compact-heading">
+            <div>
+              <h2>Choose a syllabus point</h2>
+              <p class="muted">Pick a point below to practise only that part of the course.</p>
+            </div>
+          </div>
+          <div id="syllabusPracticeGrid" class="syllabus-picker-grid"></div>
+        </section>
+        <label>
+          <span>Number of questions</span>
+          <input id="questionCount" name="questionCount" type="number" min="1" max="30" value="10">
+        </label>
+        <p id="hlPaper3Note" class="inline-note hidden">Paper 3 mode uses AHL reasoning and proof-style questions.</p>
+        <div class="form-actions">
+          <button class="primary-button" type="submit">Start practice</button>
+        </div>
+      </form>
+      <p id="setupMessage" class="status-line hidden" aria-live="polite"></p>
+    </section>
+
+    <section id="practicePanel" class="practice-layout hidden">
+      <div class="card question-card">
+        <div class="question-topline">
+          <span id="questionCounter" class="question-counter"></span>
+          <span id="questionMeta" class="muted"></span>
+        </div>
+        <p id="questionSyllabusDescription" class="syllabus-description"></p>
+        <div id="questionBadges" class="meta-row"></div>
+        <div id="questionPrompt" class="question-prompt"></div>
+        <div id="questionDiagram"></div>
+        <div id="choicesList" class="choices-list"></div>
+      </div>
+
+      <aside class="card feedback-card">
+        <div id="feedbackPanel" class="feedback-panel hidden"></div>
+        <div class="practice-actions">
+          <button id="similarButton" class="secondary-button" type="button" disabled>Try a similar question</button>
+          <button id="nextButton" class="primary-button" type="button" disabled>Next question</button>
+        </div>
+      </aside>
+    </section>
+
+    <section id="resultsPanel" class="hidden">
+      <div class="card">
+        <p class="eyebrow">Practice complete</p>
+        <h2>Results</h2>
+        <div id="scoreSummary" class="metric-grid"></div>
+      </div>
+
+      <div class="dashboard-grid">
+        <section class="card">
+          <h2>Accuracy by topic</h2>
+          <div id="topicBreakdown"></div>
+        </section>
+        <section class="card">
+          <h2>Accuracy by syllabus point</h2>
+          <div id="syllabusBreakdown"></div>
+        </section>
+        <section class="card">
+          <h2>Weak areas</h2>
+          <div id="weakAreas"></div>
+        </section>
+        <section class="card">
+          <h2>Recommended next practice</h2>
+          <p id="nextPractice" class="next-practice"></p>
+          <ul id="recommendations" class="recommendation-list"></ul>
+        </section>
+      </div>
+      <button id="newPracticeButton" class="secondary-button" type="button">Start another practice</button>
+    </section>
+  </main>
+</body>
+</html>
