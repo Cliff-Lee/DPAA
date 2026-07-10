@@ -497,12 +497,38 @@
     const invalid = state.questions
       .map((question) => ({ question, errors: validateExamQuestion(question) }))
       .filter((item) => item.errors.length);
+    const duplicateMap = new Map();
 
-    AA_UI.byId("validationSummary").innerHTML = invalid.length
-      ? `<strong>${invalid.length} invalid exam question${invalid.length === 1 ? "" : "s"}.</strong> ${invalid.map((item) => AA_UI.escapeHtml(item.question.id)).join(", ")}`
-      : `<strong>All ${state.questions.length} exam-style questions pass schema validation.</strong>`;
-    AA_UI.byId("validationSummary").classList.toggle("schema-errors", invalid.length > 0);
-    AA_UI.byId("validationSummary").classList.toggle("schema-ok", invalid.length === 0);
+    state.questions.forEach((question) => {
+      const fingerprint = [
+        question.promptLatex,
+        ...(question.parts || []).map((part) => part.promptLatex)
+      ].join(" | ")
+        .toLowerCase()
+        .replace(/\\[a-z]+/g, " ")
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!duplicateMap.has(fingerprint)) duplicateMap.set(fingerprint, []);
+      duplicateMap.get(fingerprint).push(question.id);
+    });
+
+    const duplicateGroups = [...duplicateMap.values()].filter((ids) => ids.length > 1);
+    const hasErrors = invalid.length > 0 || duplicateGroups.length > 0;
+    const messages = [];
+
+    if (invalid.length) {
+      messages.push(`<strong>${invalid.length} invalid exam question${invalid.length === 1 ? "" : "s"}.</strong> ${invalid.map((item) => AA_UI.escapeHtml(item.question.id)).join(", ")}`);
+    }
+    if (duplicateGroups.length) {
+      messages.push(`<strong>${duplicateGroups.length} duplicate question group${duplicateGroups.length === 1 ? "" : "s"}.</strong> ${duplicateGroups.map((ids) => ids.map(AA_UI.escapeHtml).join(" / ")).join(", ")}`);
+    }
+
+    AA_UI.byId("validationSummary").innerHTML = hasErrors
+      ? messages.join("<br>")
+      : `<strong>All ${state.questions.length} exam-style questions pass schema and duplicate validation.</strong>`;
+    AA_UI.byId("validationSummary").classList.toggle("schema-errors", hasErrors);
+    AA_UI.byId("validationSummary").classList.toggle("schema-ok", !hasErrors);
   }
 
   document.addEventListener("DOMContentLoaded", init);
