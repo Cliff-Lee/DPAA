@@ -51,7 +51,7 @@ function hasFirebaseConfig() {
 }
 
 function normalizeClassCode(classCode) {
-  return String(classCode || "").trim().toUpperCase();
+  return String(classCode || "").trim();
 }
 
 function normalizeNickname(nickname) {
@@ -275,6 +275,10 @@ async function initializeFirebase() {
   return state.readyPromise;
 }
 
+async function initFirebase() {
+  return initializeFirebase();
+}
+
 async function waitForAuthReady() {
   await initializeFirebase();
   if (state.authReadyPromise) await state.authReadyPromise;
@@ -286,6 +290,7 @@ async function waitForAuthReady() {
 async function ensureAnonymousStudent() {
   await waitForAuthReady();
   if (state.user?.isAnonymous) {
+    console.log("Student uid", state.user.uid);
     return state.user;
   }
   if (state.user && !state.user.isAnonymous) {
@@ -294,8 +299,43 @@ async function ensureAnonymousStudent() {
   const credential = await signInAnonymously(state.auth);
   state.user = credential.user;
   console.log("Anonymous student signed in");
+  console.log("Student uid", credential.user.uid);
   emit("aa-auth-changed", { user: publicUser() });
   return credential.user;
+}
+
+async function getClassByCode(classCode) {
+  await initFirebase();
+  await ensureAnonymousStudent();
+
+  const cleanClassCode = String(classCode || "").trim();
+
+  console.log("Checking class code:", cleanClassCode);
+  console.log("Checking path:", `classes/${cleanClassCode}`);
+  console.log(`Checking classes/${cleanClassCode}`);
+  console.log("Current user:", state.auth.currentUser?.uid);
+
+  try {
+    const classDocRef = doc(state.db, "classes", cleanClassCode);
+    const classSnap = await getDoc(classDocRef);
+
+    console.log("Class exists:", classSnap.exists());
+
+    if (!classSnap.exists()) {
+      return null;
+    }
+
+    return {
+      id: classSnap.id,
+      ...classSnap.data()
+    };
+  } catch (error) {
+    console.error("Firebase error code and message", error.code, error.message);
+    if (error.code === "permission-denied") {
+      throw new Error("Permission denied. Anonymous sign-in or Firestore rules problem.");
+    }
+    throw error;
+  }
 }
 
 async function loadStudentAttempts(classCode, studentUid, studentData = {}) {
@@ -312,20 +352,20 @@ async function loadStudentAttempts(classCode, studentUid, studentData = {}) {
   });
 }
 
-async function joinStudentClass(classCode, nickname, courseLevel) {
+async function joinStudentClass(classCode, nickname, courseLevel, knownClassData = null) {
   const targetClass = normalizeClassCode(classCode);
   const targetNickname = normalizeNickname(nickname);
   if (!targetClass) throw new Error("Enter a class code.");
   if (!targetNickname) throw new Error("Enter a nickname.");
 
-  const user = await ensureAnonymousStudent();
-  const classSnap = await getDoc(classRef(targetClass));
-  if (!classSnap.exists()) {
-    throw new Error("Class code not found. Check with your teacher.");
+  const classData = knownClassData || await getClassByCode(targetClass);
+  if (!classData) {
+    throw new Error("Class code not found. Check spelling, hyphens and capitals.");
   }
   console.log("Class found");
 
-  ensureClassCache(targetClass, classSnap.data());
+  const user = state.auth.currentUser;
+  ensureClassCache(targetClass, classData);
   const studentDoc = studentRef(targetClass, user.uid);
   const existingStudent = await getDoc(studentDoc);
   const studentPayload = {
@@ -681,6 +721,8 @@ export const AAFirebaseProvider = {
   clearAllData,
   exportClassCSV,
   initializeFirebase,
+  initFirebase,
+  getClassByCode,
   joinStudentClass,
   loadClassData,
   loadAllDataForTeacher,
