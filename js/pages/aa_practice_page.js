@@ -246,7 +246,15 @@
     if (submitButton) submitButton.disabled = true;
     showSetupMessage(window.AAStorageMode === "firebase" ? "Connecting to Firebase class..." : "Building your practice set...");
     try {
-      if (AAStorage.joinStudentClass) {
+      if (AAStorage.getClassByCode) {
+        const classData = await AAStorage.getClassByCode(profile.classCode);
+        if (!classData) {
+          showSetupMessage("Class code not found. Check spelling, hyphens and capitals.");
+          if (submitButton) submitButton.disabled = false;
+          return;
+        }
+        await AAStorage.joinStudentClass(profile.classCode, profile.nickname, profile.courseLevel, classData);
+      } else if (AAStorage.joinStudentClass) {
         await AAStorage.joinStudentClass(profile.classCode, profile.nickname, profile.courseLevel);
       }
     } catch (error) {
