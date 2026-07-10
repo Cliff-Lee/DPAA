@@ -2,6 +2,7 @@
   const SELECTED_CLASS_KEY = "AA_TEACHER_SELECTED_CLASS";
   let teacherClasses = [];
   let classesAreLoading = false;
+  let eventsBound = false;
   let loadedTeacherUid = "";
   let loadingTeacherDataPromise = null;
 
@@ -22,6 +23,9 @@
   }
 
   function bindEvents() {
+    if (eventsBound) return;
+    eventsBound = true;
+
     AA_UI.byId("classFilter").addEventListener("change", () => {
       selectClass(AA_UI.byId("classFilter").value);
     });
@@ -200,6 +204,13 @@
     return teacherClasses.some((klass) => klass.classCode === classCode);
   }
 
+  function teacherOwnsClassCode(classCode) {
+    const target = String(classCode || "").toLowerCase();
+    return teacherClasses.some((klass) => (
+      String(klass.classCode || klass.id || "").toLowerCase() === target
+    ));
+  }
+
   function populateClassDropdown(preferredClassCode = null) {
     const select = AA_UI.byId("classFilter");
     const storedClassCode = preferredClassCode ?? getStoredClassCode();
@@ -326,6 +337,10 @@
     const validationError = validateClassForm(name, classCode);
     if (validationError) {
       setCreateClassStatus(validationError, true);
+      return;
+    }
+    if (teacherOwnsClassCode(classCode)) {
+      setCreateClassStatus("You already have a class with that code.", true);
       return;
     }
 
