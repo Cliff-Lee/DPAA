@@ -4,7 +4,7 @@ Firebase support now lives behind the same storage interface used by local mode.
 
 ## Storage Mode
 
-Set the provider in `js/storage/storage_mode.js`.
+Set the provider in `js/storage/storage_manager.js`.
 
 ```js
 const STORAGE_MODE = "firebase";
@@ -16,11 +16,22 @@ For local browser-only testing, change it to:
 const STORAGE_MODE = "local";
 ```
 
-The MCQ engine, progress engine and teacher dashboard calculations still call `window.AAStorage`.
+The MCQ engine, progress engine and teacher dashboard calculations still call `window.AAStorage`. Page scripts do not call Firestore or localStorage directly.
 
 ## Firebase Config
 
-Paste the Firebase web app config into `window.AA_FIREBASE_CONFIG` before `js/storage/firebase_provider.js` loads, or into the `FIREBASE_CONFIG` object inside that file.
+The Firebase web app config lives in `js/storage/firebase_config.js`.
+
+```js
+export const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+};
+```
 
 The provider uses Firebase Web modular SDK imports from `www.gstatic.com`.
 
@@ -28,28 +39,29 @@ The provider uses Firebase Web modular SDK imports from `www.gstatic.com`.
 
 ```text
 classes/{classCode}
-  name
-  course: "AA"
-  teacherUid
-  createdAt
   archived
+  course: "AA"
+  createdAt
+  defaultLevel
+  name
+  teacherUid
 
-classes/{classCode}/students/{studentId}
+classes/{classCode}/students/{studentUid}
   nickname
   courseLevel
   joinedAt
   lastSeen
 
-classes/{classCode}/students/{studentId}/attempts/{attemptId}
+classes/{classCode}/students/{studentUid}/attempts/{attemptId}
   attempt data
 
-classes/{classCode}/students/{studentId}/syllabusStats/{syllabusId}
-  calculated stats
+classes/{classCode}/students/{studentUid}/syllabusStats/{syllabusId}
+  progress data
 ```
 
-Student practice does not require sign-in. Students save attempts with a class code and nickname.
+Student practice signs in anonymously after a student enters a valid class code and nickname. Attempts are saved under the anonymous `auth.uid`.
 
-The teacher dashboard requires Firebase Auth sign-in when Firebase mode is active.
+The teacher dashboard requires Firebase Auth email/password sign-in when Firebase mode is active. The dashboard then checks `teachers/{teacherUid}` and loads only classes where `teacherUid == auth.uid`.
 
 ## Keep These Contracts
 
@@ -63,7 +75,7 @@ The teacher dashboard requires Firebase Auth sign-in when Firebase mode is activ
 
 Before using real student data, configure Firestore rules for:
 
-- unauthenticated or limited student writes to allowed class-code paths,
+- anonymous student reads of their class document and writes to their own student/attempt/stats paths,
 - teacher-only dashboard reads,
-- teacher ownership or workspace membership,
+- teacher ownership through `classes/{classCode}.teacherUid`,
 - validation of the attempt object fields.
