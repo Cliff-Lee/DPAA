@@ -98,6 +98,22 @@ function ensureClassCache(classCode, data = {}) {
   return state.classes[target];
 }
 
+function publicClassRecord(klass) {
+  const students = klass.students || [];
+  return {
+    classCode: klass.classCode,
+    id: klass.classCode,
+    name: klass.name || klass.classCode,
+    teacherUid: klass.teacherUid || null,
+    teacherEmail: klass.teacherEmail || null,
+    archived: Boolean(klass.archived),
+    defaultLevel: klass.defaultLevel || "SL",
+    createdAt: klass.createdAt || null,
+    studentCount: students.length,
+    students: [...students]
+  };
+}
+
 function cacheStudentProfile(classCode, studentUid, data = {}) {
   const klass = ensureClassCache(classCode);
   const nickname = normalizeNickname(data.nickname || studentUid);
@@ -593,6 +609,51 @@ async function getTeacherClasses() {
   }));
 }
 
+async function loadTeacherClasses() {
+  const teacherClasses = await getTeacherClasses();
+  teacherClasses.forEach((klass) => {
+    ensureClassCache(klass.classCode, klass.data);
+  });
+  return getClasses();
+}
+
+async function createTeacherClass({ name, classCode }) {
+  await verifyTeacher();
+  const cleanName = String(name || "").trim();
+  const cleanClassCode = normalizeClassCode(classCode);
+  if (!cleanName || !cleanClassCode) {
+    throw new Error("Class name and class code are required.");
+  }
+  if (cleanClassCode.length < 3 || cleanClassCode.length > 30) {
+    throw new Error("Class code must be between 3 and 30 characters.");
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(cleanClassCode)) {
+    throw new Error("Class code can only contain letters, numbers, hyphens or underscores.");
+  }
+
+  const newClassRef = classRef(cleanClassCode);
+  const existingClass = await getDoc(newClassRef);
+  if (existingClass.exists()) {
+    throw new Error("A class with that code already exists.");
+  }
+
+  const teacherUid = getCurrentTeacherUid();
+  const teacherEmail = state.auth.currentUser?.email || "";
+  const payload = {
+    name: cleanName,
+    teacherUid,
+    teacherEmail,
+    createdAt: serverTimestamp()
+  };
+  await setDoc(newClassRef, payload);
+  const cached = ensureClassCache(cleanClassCode, {
+    ...payload,
+    createdAt: new Date().toISOString()
+  });
+  emit("aa-storage-updated", { mode: "firebase", classCode: cleanClassCode });
+  return publicClassRecord(cached);
+}
+
 async function signInTeacher(email, password) {
   await waitForAuthReady();
   if (!email || !password) throw new Error("Enter the teacher email and password.");
@@ -607,8 +668,6 @@ async function signInTeacher(email, password) {
     state.user = null;
     throw error;
   });
-  await loadAllDataForTeacher();
-  emit("aa-auth-changed", { user: publicUser() });
   return publicUser();
 }
 
@@ -630,6 +689,32 @@ async function loadAllDataForTeacher() {
   return getAttempts();
 }
 
+async function clearClassDataAsync(classCode) {
+  await verifyTeacher();
+  const target = normalizeClassCode(classCode);
+  if (!target) return;
+  const studentsSnap = await getDocs(collection(state.db, "classes", target, "students"));
+  await Promise.all(studentsSnap.docs.map(async (studentDoc) => {
+    const attemptsSnap = await getDocs(collection(studentDoc.ref, "attempts"));
+    const statsSnap = await getDocs(collection(studentDoc.ref, "syllabusStats"));
+    await Promise.all([
+      ...attemptsSnap.docs.map((attemptDoc) => deleteDoc(attemptDoc.ref)),
+      ...statsSnap.docs.map((statsDoc) => deleteDoc(statsDoc.ref))
+    ]);
+  }));
+  state.attempts = state.attempts.filter((attempt) => normalizeClassCode(attempt.classCode) !== target);
+  console.log("Firebase class attempts reset", target);
+}
+
+function clearClassData(classCode) {
+  return clearClassDataAsync(classCode)
+    .then(() => emit("aa-storage-updated", { mode: "firebase", classCode: normalizeClassCode(classCode) }))
+    .catch((error) => {
+      emit("aa-storage-error", { mode: "firebase", message: error.message });
+      throw error;
+    });
+}
+
 async function signOutTeacher() {
   await waitForAuthReady();
   await signOut(state.auth);
@@ -645,27 +730,13 @@ async function signOutTeacher() {
 async function clearAllDataAsync() {
   await verifyTeacher();
   const classCodes = Object.keys(state.classes);
-  await Promise.all(classCodes.map(async (classCode) => {
-    const studentsSnap = await getDocs(collection(state.db, "classes", classCode, "students"));
-    await Promise.all(studentsSnap.docs.map(async (studentDoc) => {
-      const attemptsSnap = await getDocs(collection(studentDoc.ref, "attempts"));
-      const statsSnap = await getDocs(collection(studentDoc.ref, "syllabusStats"));
-      await Promise.all([
-        ...attemptsSnap.docs.map((attemptDoc) => deleteDoc(attemptDoc.ref)),
-        ...statsSnap.docs.map((statsDoc) => deleteDoc(statsDoc.ref))
-      ]);
-    }));
-  }));
+  await Promise.all(classCodes.map((classCode) => clearClassDataAsync(classCode)));
   console.log("Firebase teacher-visible attempts reset");
 }
 
 function clearAllData() {
   state.attempts = [];
-  Object.values(state.classes).forEach((klass) => {
-    klass.students = [];
-    klass.studentProfiles = {};
-  });
-  clearAllDataAsync()
+  return clearAllDataAsync()
     .then(() => emit("aa-storage-updated", { mode: "firebase" }))
     .catch((error) => emit("aa-storage-error", { mode: "firebase", message: error.message }));
 }
@@ -710,7 +781,9 @@ function exportClassCSV(classCode) {
 }
 
 function getClasses() {
-  return Object.values(state.classes).sort((a, b) => a.classCode.localeCompare(b.classCode));
+  return Object.values(state.classes)
+    .map(publicClassRecord)
+    .sort((a, b) => a.classCode.localeCompare(b.classCode));
 }
 
 export const AAFirebaseProvider = {
@@ -728,7 +801,10 @@ export const AAFirebaseProvider = {
   joinStudentClass,
   loadClassData,
   loadAllDataForTeacher,
+  loadTeacherClasses,
   getTeacherClasses,
+  createTeacherClass,
+  clearClassData,
   signInTeacher,
   signOutTeacher,
   getAuthUser: publicUser,

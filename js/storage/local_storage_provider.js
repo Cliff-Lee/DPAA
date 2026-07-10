@@ -39,6 +39,20 @@
     writeJSON(CLASS_KEY, classes);
   }
 
+  function classRecord(classCode, data = {}) {
+    const students = data.students || getStudentsByClass(classCode);
+    return {
+      classCode,
+      id: classCode,
+      name: data.name || classCode,
+      teacherUid: data.teacherUid || null,
+      teacherEmail: data.teacherEmail || null,
+      createdAt: data.createdAt || null,
+      studentCount: students.length,
+      students
+    };
+  }
+
   function saveAttempt(attempt) {
     const attempts = getAttempts();
     const classCode = normalizeClassCode(attempt.classCode);
@@ -150,6 +164,52 @@
     localStorage.removeItem(CLASS_KEY);
   }
 
+  function clearClassData(classCode) {
+    const target = normalizeClassCode(classCode);
+    if (!target) return;
+    setAttempts(getAttempts().filter((attempt) => normalizeClassCode(attempt.classCode) !== target));
+    const classes = getClasses();
+    if (classes[target]) classes[target].students = [];
+    setClasses(classes);
+  }
+
+  function loadTeacherClasses() {
+    const classes = getClasses();
+    getAttempts().forEach((attempt) => {
+      const classCode = normalizeClassCode(attempt.classCode);
+      if (!classCode) return;
+      if (!classes[classCode]) classes[classCode] = { classCode, name: classCode, students: [] };
+      const nickname = normalizeNickname(attempt.nickname);
+      if (nickname && !classes[classCode].students.includes(nickname)) classes[classCode].students.push(nickname);
+    });
+    setClasses(classes);
+    return Object.entries(classes)
+      .map(([classCode, data]) => classRecord(classCode, data))
+      .sort((a, b) => a.classCode.localeCompare(b.classCode));
+  }
+
+  async function createTeacherClass({ name, classCode }) {
+    const cleanName = String(name || "").trim();
+    const cleanClassCode = normalizeClassCode(classCode);
+    if (!cleanName || !cleanClassCode) throw new Error("Class name and class code are required.");
+    if (cleanClassCode.length < 3 || cleanClassCode.length > 30) {
+      throw new Error("Class code must be between 3 and 30 characters.");
+    }
+    if (!/^[A-Za-z0-9_-]+$/.test(cleanClassCode)) {
+      throw new Error("Class code can only contain letters, numbers, hyphens or underscores.");
+    }
+    const classes = getClasses();
+    if (classes[cleanClassCode]) throw new Error("A class with that code already exists.");
+    classes[cleanClassCode] = {
+      classCode: cleanClassCode,
+      name: cleanName,
+      createdAt: new Date().toISOString(),
+      students: []
+    };
+    setClasses(classes);
+    return classRecord(cleanClassCode, classes[cleanClassCode]);
+  }
+
   function csvEscape(value) {
     const text = Array.isArray(value) ? value.join("|") : String(value ?? "");
     return `"${text.replace(/"/g, '""')}"`;
@@ -198,7 +258,11 @@
     getStudentStats,
     getSyllabusStats,
     clearAllData,
-    exportClassCSV
+    clearClassData,
+    exportClassCSV,
+    loadTeacherClasses,
+    createTeacherClass,
+    getClasses: loadTeacherClasses
   };
 
   window.AAStorage = window.AALocalStorageProvider;
