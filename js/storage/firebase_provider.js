@@ -1,543 +1,682 @@
-(function () {
-  const FIREBASE_VERSION = "10.12.5";
-  const FIREBASE_CONFIG = window.AA_FIREBASE_CONFIG || {
-    apiKey: "",
-    authDomain: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import {
+  getAuth,
+  signInAnonymously,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  addDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  serverTimestamp,
+  increment,
+  deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+import { firebaseConfig } from "./firebase_config.js";
+
+const state = {
+  app: null,
+  auth: null,
+  db: null,
+  user: null,
+  ready: false,
+  readyPromise: null,
+  authReadyPromise: null,
+  initError: null,
+  teacherVerified: false,
+  teacherProfile: null,
+  studentProfile: null,
+  attempts: [],
+  classes: {},
+  loadedClasses: new Set(),
+  loadingClasses: new Map()
+};
+
+function emit(eventName, detail = {}) {
+  window.dispatchEvent(new CustomEvent(eventName, { detail }));
+}
+
+function hasFirebaseConfig() {
+  return Boolean(firebaseConfig?.apiKey && firebaseConfig?.authDomain && firebaseConfig?.projectId && firebaseConfig?.appId);
+}
+
+function normalizeClassCode(classCode) {
+  return String(classCode || "").trim().toUpperCase();
+}
+
+function normalizeNickname(nickname) {
+  return String(nickname || "").trim();
+}
+
+function makeAttemptId(attempt) {
+  return attempt.attemptId || `AA-ATT-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function toISOString(value) {
+  if (!value) return new Date().toISOString();
+  if (typeof value === "string") return value;
+  if (typeof value.toDate === "function") return value.toDate().toISOString();
+  if (typeof value.seconds === "number") return new Date(value.seconds * 1000).toISOString();
+  return new Date(value).toISOString();
+}
+
+function publicUser() {
+  if (!state.user) return null;
+  return {
+    uid: state.user.uid,
+    email: state.user.email,
+    displayName: state.user.displayName,
+    isAnonymous: Boolean(state.user.isAnonymous),
+    isTeacher: Boolean(state.teacherVerified && !state.user.isAnonymous)
   };
+}
 
-  const state = {
-    app: null,
-    auth: null,
-    db: null,
-    user: null,
-    ready: false,
-    readyPromise: null,
-    initError: null,
-    attempts: [],
-    classes: {},
-    loadedClasses: new Set(),
-    loadingClasses: new Map(),
-    teacherLoaded: false,
-    modules: {}
+function ensureClassCache(classCode, data = {}) {
+  const target = normalizeClassCode(classCode);
+  const existing = state.classes[target] || {};
+  state.classes[target] = {
+    classCode: target,
+    name: data.name || existing.name || target,
+    course: data.course || existing.course || "AA",
+    archived: Boolean(data.archived ?? existing.archived ?? false),
+    defaultLevel: data.defaultLevel || existing.defaultLevel || "SL",
+    teacherUid: data.teacherUid || existing.teacherUid || null,
+    createdAt: data.createdAt || existing.createdAt || null,
+    students: existing.students || [],
+    studentProfiles: existing.studentProfiles || {}
   };
+  return state.classes[target];
+}
 
-  function hasFirebaseConfig() {
-    return Boolean(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.authDomain && FIREBASE_CONFIG.projectId && FIREBASE_CONFIG.appId);
+function cacheStudentProfile(classCode, studentUid, data = {}) {
+  const klass = ensureClassCache(classCode);
+  const nickname = normalizeNickname(data.nickname || studentUid);
+  klass.studentProfiles[studentUid] = {
+    studentUid,
+    nickname,
+    courseLevel: data.courseLevel || "SL",
+    joinedAt: data.joinedAt || null,
+    lastSeen: data.lastSeen || null
+  };
+  if (nickname && !klass.students.includes(nickname)) {
+    klass.students.push(nickname);
+    klass.students.sort((a, b) => a.localeCompare(b));
   }
+}
 
-  function emit(eventName, detail = {}) {
-    window.dispatchEvent(new CustomEvent(eventName, { detail }));
+function normalizeAttempt(attempt) {
+  const classCode = normalizeClassCode(attempt.classCode);
+  const nickname = normalizeNickname(attempt.nickname);
+  return {
+    attemptId: makeAttemptId(attempt),
+    course: "AA",
+    classCode,
+    nickname,
+    courseLevel: attempt.courseLevel || "SL",
+    studentUid: attempt.studentUid || state.studentProfile?.uid || state.user?.uid || "",
+    questionId: attempt.questionId,
+    topicId: attempt.topicId,
+    topicName: attempt.topicName,
+    syllabusId: attempt.syllabusId,
+    syllabusLabel: attempt.syllabusLabel,
+    level: attempt.level,
+    difficulty: Number(attempt.difficulty || 0),
+    paperStyle: attempt.paperStyle,
+    calculator: attempt.calculator,
+    commandTerm: attempt.commandTerm,
+    assessmentObjectiveTags: attempt.assessmentObjectiveTags || [],
+    skillTags: attempt.skillTags || [],
+    misconceptionTags: attempt.misconceptionTags || [],
+    selectedIndex: Number(attempt.selectedIndex),
+    correctIndex: Number(attempt.correctIndex),
+    isCorrect: Boolean(attempt.isCorrect),
+    timeTakenSeconds: Number(attempt.timeTakenSeconds || 0),
+    createdAt: toISOString(attempt.createdAt)
+  };
+}
+
+function attemptCacheKey(attempt) {
+  return `${normalizeClassCode(attempt.classCode)}:${attempt.studentUid || normalizeNickname(attempt.nickname)}:${attempt.attemptId}`;
+}
+
+function cacheAttempt(attempt) {
+  const key = attemptCacheKey(attempt);
+  const index = state.attempts.findIndex((item) => attemptCacheKey(item) === key);
+  if (index >= 0) state.attempts[index] = attempt;
+  else state.attempts.push(attempt);
+  ensureClassCache(attempt.classCode);
+  if (attempt.studentUid) {
+    cacheStudentProfile(attempt.classCode, attempt.studentUid, {
+      nickname: attempt.nickname,
+      courseLevel: attempt.courseLevel
+    });
   }
+}
 
-  function normalizeClassCode(classCode) {
-    return String(classCode || "").trim().toUpperCase();
-  }
+function summarize(attempts) {
+  const total = attempts.length;
+  const correct = attempts.filter((attempt) => attempt.isCorrect).length;
+  const totalTimeSeconds = attempts.reduce((sum, attempt) => sum + Number(attempt.timeTakenSeconds || 0), 0);
+  return {
+    totalAttempts: total,
+    correct,
+    accuracy: total ? correct / total : 0,
+    averageTimeSeconds: total ? totalTimeSeconds / total : 0,
+    totalTimeSeconds
+  };
+}
 
-  function normalizeNickname(nickname) {
-    return String(nickname || "").trim();
-  }
+function studentAttemptsByUid(classCode, studentUid) {
+  const target = normalizeClassCode(classCode);
+  return state.attempts.filter((attempt) =>
+    normalizeClassCode(attempt.classCode) === target &&
+    attempt.studentUid === studentUid
+  );
+}
 
-  function studentIdFromNickname(nickname) {
-    const normalized = normalizeNickname(nickname).toLowerCase().replace(/\s+/g, "-");
-    return encodeURIComponent(normalized || "anonymous-student").replace(/\./g, "%2E");
-  }
+function studentAttemptsByNickname(classCode, nickname) {
+  const target = normalizeClassCode(classCode);
+  const targetName = normalizeNickname(nickname);
+  return state.attempts.filter((attempt) =>
+    normalizeClassCode(attempt.classCode) === target &&
+    normalizeNickname(attempt.nickname) === targetName
+  );
+}
 
-  function makeAttemptId(attempt) {
-    return attempt.attemptId || `AA-ATT-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }
+function classRef(classCode) {
+  return doc(state.db, "classes", normalizeClassCode(classCode));
+}
 
-  function normalizeAttempt(attempt) {
-    const classCode = normalizeClassCode(attempt.classCode);
-    const nickname = normalizeNickname(attempt.nickname);
-    return {
-      attemptId: makeAttemptId(attempt),
-      course: "AA",
-      classCode,
-      nickname,
-      courseLevel: attempt.courseLevel,
-      questionId: attempt.questionId,
-      topicId: attempt.topicId,
-      topicName: attempt.topicName,
-      syllabusId: attempt.syllabusId,
-      syllabusLabel: attempt.syllabusLabel,
-      level: attempt.level,
-      difficulty: Number(attempt.difficulty || 0),
-      paperStyle: attempt.paperStyle,
-      calculator: attempt.calculator,
-      commandTerm: attempt.commandTerm,
-      assessmentObjectiveTags: attempt.assessmentObjectiveTags || [],
-      skillTags: attempt.skillTags || [],
-      misconceptionTags: attempt.misconceptionTags || [],
-      selectedIndex: Number(attempt.selectedIndex),
-      correctIndex: Number(attempt.correctIndex),
-      isCorrect: Boolean(attempt.isCorrect),
-      timeTakenSeconds: Number(attempt.timeTakenSeconds || 0),
-      createdAt: attempt.createdAt || new Date().toISOString()
-    };
-  }
+function studentRef(classCode, studentUid) {
+  return doc(state.db, "classes", normalizeClassCode(classCode), "students", studentUid);
+}
 
-  function cacheAttempt(attempt) {
-    const index = state.attempts.findIndex((item) => item.attemptId === attempt.attemptId);
-    if (index >= 0) state.attempts[index] = attempt;
-    else state.attempts.push(attempt);
+function attemptRef(attempt) {
+  return doc(
+    state.db,
+    "classes",
+    normalizeClassCode(attempt.classCode),
+    "students",
+    attempt.studentUid,
+    "attempts",
+    attempt.attemptId
+  );
+}
 
-    const classCode = normalizeClassCode(attempt.classCode);
-    if (!state.classes[classCode]) {
-      state.classes[classCode] = { classCode, name: classCode, course: "AA", archived: false, students: [] };
+function syllabusStatsRef(classCode, studentUid, syllabusId) {
+  return doc(
+    state.db,
+    "classes",
+    normalizeClassCode(classCode),
+    "students",
+    studentUid,
+    "syllabusStats",
+    syllabusId || "unknown"
+  );
+}
+
+async function initializeFirebase() {
+  if (state.readyPromise) return state.readyPromise;
+
+  state.readyPromise = (async () => {
+    if (!hasFirebaseConfig()) {
+      throw new Error("Firebase config missing. Add js/storage/firebase_config.js with an exported firebaseConfig object.");
     }
-    const student = normalizeNickname(attempt.nickname);
-    if (student && !state.classes[classCode].students.includes(student)) {
-      state.classes[classCode].students.push(student);
-      state.classes[classCode].students.sort((a, b) => a.localeCompare(b));
-    }
-  }
 
-  async function loadFirebaseModules() {
-    const [appModule, authModule, firestoreModule] = await Promise.all([
-      import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app.js`),
-      import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-auth.js`),
-      import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-firestore.js`)
-    ]);
-    state.modules = { appModule, authModule, firestoreModule };
-  }
+    state.app = initializeApp(firebaseConfig);
+    state.auth = getAuth(state.app);
+    state.db = getFirestore(state.app);
+    state.ready = true;
+    console.log("Firebase initialized");
 
-  function initializeFirebase() {
-    if (state.readyPromise) return state.readyPromise;
-
-    state.readyPromise = (async () => {
-      if (!hasFirebaseConfig()) {
-        throw new Error("Firebase config missing. Add your web app config to window.AA_FIREBASE_CONFIG or js/storage/firebase_provider.js.");
-      }
-
-      await loadFirebaseModules();
-      const { initializeApp } = state.modules.appModule;
-      const { getAuth, onAuthStateChanged } = state.modules.authModule;
-      const { getFirestore } = state.modules.firestoreModule;
-
-      state.app = initializeApp(FIREBASE_CONFIG);
-      state.auth = getAuth(state.app);
-      state.db = getFirestore(state.app);
-      state.ready = true;
-
+    state.authReadyPromise = new Promise((resolve) => {
+      let firstRun = true;
       onAuthStateChanged(state.auth, (user) => {
         state.user = user || null;
+        if (!user || user.isAnonymous) {
+          state.teacherVerified = false;
+          state.teacherProfile = null;
+        }
         emit("aa-auth-changed", { user: publicUser() });
+        if (firstRun) {
+          firstRun = false;
+          resolve(user || null);
+        }
       });
-
-      emit("aa-storage-ready", { mode: "firebase" });
-      return state;
-    })().catch((error) => {
-      state.initError = error;
-      state.ready = false;
-      emit("aa-storage-error", { mode: "firebase", message: error.message });
-      return state;
     });
 
-    return state.readyPromise;
-  }
+    emit("aa-storage-ready", { mode: "firebase" });
+    return state;
+  })().catch((error) => {
+    state.initError = error;
+    state.ready = false;
+    emit("aa-storage-error", { mode: "firebase", message: error.message });
+    throw error;
+  });
 
-  async function withFirestore(work) {
-    await initializeFirebase();
-    if (!state.ready || !state.db) throw state.initError || new Error("Firebase provider is not ready.");
-    return work(state.modules.firestoreModule);
-  }
+  return state.readyPromise;
+}
 
-  function classRef(firestoreModule, classCode) {
-    return firestoreModule.doc(state.db, "classes", normalizeClassCode(classCode));
+async function waitForAuthReady() {
+  await initializeFirebase();
+  if (state.authReadyPromise) await state.authReadyPromise;
+  if (!state.ready || !state.db || !state.auth) {
+    throw state.initError || new Error("Firebase provider is not ready.");
   }
+}
 
-  function studentRef(firestoreModule, classCode, studentId) {
-    return firestoreModule.doc(state.db, "classes", normalizeClassCode(classCode), "students", studentId);
+async function ensureAnonymousStudent() {
+  await waitForAuthReady();
+  if (state.user?.isAnonymous) {
+    return state.user;
   }
-
-  function attemptRef(firestoreModule, attempt) {
-    return firestoreModule.doc(
-      state.db,
-      "classes",
-      normalizeClassCode(attempt.classCode),
-      "students",
-      studentIdFromNickname(attempt.nickname),
-      "attempts",
-      attempt.attemptId
-    );
+  if (state.user && !state.user.isAnonymous) {
+    await signOut(state.auth);
   }
+  const credential = await signInAnonymously(state.auth);
+  state.user = credential.user;
+  console.log("Anonymous student signed in");
+  emit("aa-auth-changed", { user: publicUser() });
+  return credential.user;
+}
 
-  function syllabusStatsRef(firestoreModule, attempt) {
-    return firestoreModule.doc(
-      state.db,
-      "classes",
-      normalizeClassCode(attempt.classCode),
-      "students",
-      studentIdFromNickname(attempt.nickname),
-      "syllabusStats",
-      attempt.syllabusId || "unknown"
-    );
-  }
-
-  function studentAttempts(classCode, nickname) {
-    const targetClass = normalizeClassCode(classCode);
-    const targetName = normalizeNickname(nickname);
-    return state.attempts.filter((attempt) =>
-      normalizeClassCode(attempt.classCode) === targetClass &&
-      normalizeNickname(attempt.nickname) === targetName
-    );
-  }
-
-  function summarize(attempts) {
-    const total = attempts.length;
-    const correct = attempts.filter((attempt) => attempt.isCorrect).length;
-    const averageTime = total
-      ? attempts.reduce((sum, attempt) => sum + Number(attempt.timeTakenSeconds || 0), 0) / total
-      : 0;
-    return {
-      totalAttempts: total,
-      correct,
-      accuracy: total ? correct / total : 0,
-      averageTimeSeconds: averageTime
-    };
-  }
-
-  function buildSyllabusStat(attempts, syllabusId) {
-    const rows = attempts.filter((attempt) => attempt.syllabusId === syllabusId);
-    const summary = summarize(rows);
-    const latest = rows[rows.length - 1] || {};
-    return {
-      syllabusId,
-      syllabusLabel: latest.syllabusLabel || "Unknown syllabus point",
-      attempts: summary.totalAttempts,
-      correct: summary.correct,
-      accuracy: summary.accuracy,
-      averageTimeSeconds: summary.averageTimeSeconds,
-      updatedAt: new Date().toISOString()
-    };
-  }
-
-  async function writeSyllabusStats(attempt) {
-    const attempts = studentAttempts(attempt.classCode, attempt.nickname);
-    const stat = buildSyllabusStat(attempts, attempt.syllabusId || "unknown");
-    await withFirestore(async ({ setDoc, serverTimestamp }) => {
-      await setDoc(syllabusStatsRef(state.modules.firestoreModule, attempt), {
-        ...stat,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+async function loadStudentAttempts(classCode, studentUid, studentData = {}) {
+  const attemptsSnap = await getDocs(collection(state.db, "classes", normalizeClassCode(classCode), "students", studentUid, "attempts"));
+  attemptsSnap.forEach((attemptDoc) => {
+    const attempt = normalizeAttempt({
+      ...attemptDoc.data(),
+      attemptId: attemptDoc.data().attemptId || attemptDoc.id,
+      classCode,
+      studentUid,
+      nickname: attemptDoc.data().nickname || studentData.nickname
     });
+    cacheAttempt(attempt);
+  });
+}
+
+async function joinStudentClass(classCode, nickname, courseLevel) {
+  const targetClass = normalizeClassCode(classCode);
+  const targetNickname = normalizeNickname(nickname);
+  if (!targetClass) throw new Error("Enter a class code.");
+  if (!targetNickname) throw new Error("Enter a nickname.");
+
+  const user = await ensureAnonymousStudent();
+  const classSnap = await getDoc(classRef(targetClass));
+  if (!classSnap.exists()) {
+    throw new Error("Class code not found. Check with your teacher.");
+  }
+  console.log("Class found");
+
+  ensureClassCache(targetClass, classSnap.data());
+  const studentDoc = studentRef(targetClass, user.uid);
+  const existingStudent = await getDoc(studentDoc);
+  const studentPayload = {
+    nickname: targetNickname,
+    courseLevel,
+    lastSeen: serverTimestamp()
+  };
+  if (!existingStudent.exists()) studentPayload.joinedAt = serverTimestamp();
+
+  await setDoc(studentDoc, studentPayload, { merge: true });
+  console.log("Student profile saved");
+
+  state.studentProfile = {
+    uid: user.uid,
+    classCode: targetClass,
+    nickname: targetNickname,
+    courseLevel
+  };
+  cacheStudentProfile(targetClass, user.uid, {
+    nickname: targetNickname,
+    courseLevel
+  });
+  await loadStudentAttempts(targetClass, user.uid, state.studentProfile);
+  emit("aa-storage-updated", { mode: "firebase", classCode: targetClass });
+  return { ...state.studentProfile };
+}
+
+function buildSyllabusStat(classCode, studentUid, syllabusId) {
+  const rows = studentAttemptsByUid(classCode, studentUid).filter((attempt) => attempt.syllabusId === syllabusId);
+  const summary = summarize(rows);
+  const latest = rows[rows.length - 1] || {};
+  const masteryScore = summary.totalAttempts < 3
+    ? "Not enough evidence"
+    : summary.accuracy * Math.min(1, summary.totalAttempts / 5);
+
+  return {
+    syllabusId,
+    syllabusLabel: latest.syllabusLabel || "Unknown syllabus point",
+    attempts: summary.totalAttempts,
+    correct: summary.correct,
+    accuracy: summary.accuracy,
+    averageTimeSeconds: summary.averageTimeSeconds,
+    totalTimeSeconds: summary.totalTimeSeconds,
+    masteryScore
+  };
+}
+
+async function updateSyllabusStats(attempt) {
+  const stat = buildSyllabusStat(attempt.classCode, attempt.studentUid, attempt.syllabusId || "unknown");
+  await setDoc(syllabusStatsRef(attempt.classCode, attempt.studentUid, attempt.syllabusId || "unknown"), {
+    ...stat,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+async function persistAttempt(attempt) {
+  await waitForAuthReady();
+  if (!attempt.studentUid || !state.studentProfile || state.studentProfile.classCode !== attempt.classCode) {
+    await joinStudentClass(attempt.classCode, attempt.nickname, attempt.courseLevel);
+    attempt.studentUid = state.studentProfile.uid;
+    cacheAttempt(attempt);
   }
 
-  async function persistAttempt(attempt) {
-    await withFirestore(async ({ setDoc, serverTimestamp }) => {
-      const classCode = normalizeClassCode(attempt.classCode);
-      const nickname = normalizeNickname(attempt.nickname);
-      const studentId = studentIdFromNickname(nickname);
-      const currentTeacherUid = state.user?.uid || null;
-      const classData = {
-        name: classCode,
-        course: "AA",
-        createdAt: serverTimestamp(),
-        archived: false
+  await setDoc(attemptRef(attempt), {
+    ...attempt,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  console.log("Attempt saved");
+  await updateSyllabusStats(attempt);
+  emit("aa-storage-updated", { mode: "firebase", classCode: attempt.classCode });
+}
+
+function saveAttempt(attempt) {
+  const storedAttempt = normalizeAttempt({
+    ...attempt,
+    studentUid: attempt.studentUid || state.studentProfile?.uid || state.user?.uid || ""
+  });
+  cacheAttempt(storedAttempt);
+  persistAttempt(storedAttempt).catch((error) => {
+    emit("aa-storage-error", { mode: "firebase", message: error.message, attemptId: storedAttempt.attemptId });
+  });
+  return storedAttempt;
+}
+
+function getAttempts() {
+  return [...state.attempts].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+}
+
+function getAttemptsByClass(classCode) {
+  const target = normalizeClassCode(classCode);
+  if (target) loadClassData(target).catch(() => {});
+  return getAttempts().filter((attempt) => !target || normalizeClassCode(attempt.classCode) === target);
+}
+
+function getStudentsByClass(classCode) {
+  const target = normalizeClassCode(classCode);
+  if (target) loadClassData(target).catch(() => {});
+  const fromAttempts = getAttemptsByClass(target)
+    .map((attempt) => normalizeNickname(attempt.nickname))
+    .filter(Boolean);
+  const fromClass = state.classes[target]?.students || [];
+  return [...new Set([...fromClass, ...fromAttempts])].sort((a, b) => a.localeCompare(b));
+}
+
+function getStudentStats(classCode, nickname) {
+  const targetClass = normalizeClassCode(classCode);
+  const targetName = normalizeNickname(nickname);
+  if (targetClass) loadClassData(targetClass).catch(() => {});
+  const attempts = studentAttemptsByNickname(targetClass, targetName);
+  return {
+    classCode: targetClass,
+    nickname: targetName,
+    attempts,
+    ...summarize(attempts)
+  };
+}
+
+function getSyllabusStats(classCode, nickname) {
+  const attempts = getStudentStats(classCode, nickname).attempts;
+  const groups = {};
+  attempts.forEach((attempt) => {
+    const key = attempt.syllabusId || "unknown";
+    if (!groups[key]) {
+      groups[key] = {
+        syllabusId: key,
+        syllabusLabel: attempt.syllabusLabel || "Unknown syllabus point",
+        attempts: 0,
+        correct: 0,
+        totalTimeSeconds: 0
       };
-      if (currentTeacherUid) classData.teacherUid = currentTeacherUid;
+    }
+    groups[key].attempts += 1;
+    groups[key].totalTimeSeconds += Number(attempt.timeTakenSeconds || 0);
+    if (attempt.isCorrect) groups[key].correct += 1;
+  });
 
-      await setDoc(classRef(state.modules.firestoreModule, classCode), classData, { merge: true });
+  return Object.values(groups).map((row) => ({
+    syllabusId: row.syllabusId,
+    syllabusLabel: row.syllabusLabel,
+    attempts: row.attempts,
+    correct: row.correct,
+    accuracy: row.attempts ? row.correct / row.attempts : 0,
+    averageTimeSeconds: row.attempts ? row.totalTimeSeconds / row.attempts : 0
+  }));
+}
 
-      await setDoc(studentRef(state.modules.firestoreModule, classCode, studentId), {
-        nickname,
-        courseLevel: attempt.courseLevel,
-        joinedAt: serverTimestamp(),
-        lastSeen: serverTimestamp()
-      }, { merge: true });
+async function loadCurrentStudentClass(classCode) {
+  if (!state.studentProfile || state.studentProfile.classCode !== normalizeClassCode(classCode)) return;
+  await loadStudentAttempts(state.studentProfile.classCode, state.studentProfile.uid, state.studentProfile);
+}
 
-      await setDoc(attemptRef(state.modules.firestoreModule, attempt), {
-        ...attempt,
-        studentId,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-    });
+async function loadClassRosterAndAttempts(classCode, force = false) {
+  const target = normalizeClassCode(classCode);
+  if (!target) return;
+  if (!force && state.loadedClasses.has(target)) return;
 
-    await writeSyllabusStats(attempt);
-    emit("aa-storage-updated", { mode: "firebase", classCode: attempt.classCode });
+  const classSnap = await getDoc(classRef(target));
+  if (classSnap.exists()) ensureClassCache(target, classSnap.data());
+
+  const studentsSnap = await getDocs(collection(state.db, "classes", target, "students"));
+  await Promise.all(studentsSnap.docs.map(async (studentDoc) => {
+    const data = studentDoc.data();
+    cacheStudentProfile(target, studentDoc.id, data);
+    await loadStudentAttempts(target, studentDoc.id, data);
+  }));
+  state.loadedClasses.add(target);
+  emit("aa-storage-updated", { mode: "firebase", classCode: target });
+}
+
+async function loadClassData(classCode) {
+  const target = normalizeClassCode(classCode);
+  if (!target) return;
+  if (state.loadingClasses.has(target)) return state.loadingClasses.get(target);
+
+  const promise = (async () => {
+    await waitForAuthReady();
+    if (state.user?.isAnonymous) {
+      await loadCurrentStudentClass(target);
+      return;
+    }
+    if (state.teacherVerified) {
+      await loadClassRosterAndAttempts(target);
+    }
+  })().finally(() => {
+    state.loadingClasses.delete(target);
+  });
+
+  state.loadingClasses.set(target, promise);
+  return promise;
+}
+
+async function verifyTeacher() {
+  await waitForAuthReady();
+  if (!state.user || state.user.isAnonymous) {
+    throw new Error("Teacher sign-in required.");
   }
-
-  function saveAttempt(attempt) {
-    const storedAttempt = normalizeAttempt(attempt);
-    cacheAttempt(storedAttempt);
-    persistAttempt(storedAttempt).catch((error) => {
-      emit("aa-storage-error", { mode: "firebase", message: error.message, attemptId: storedAttempt.attemptId });
-    });
-    return storedAttempt;
+  const teacherSnap = await getDoc(doc(state.db, "teachers", state.user.uid));
+  if (!teacherSnap.exists()) {
+    state.teacherVerified = false;
+    state.teacherProfile = null;
+    throw new Error("This account is not registered as a teacher.");
   }
+  state.teacherVerified = true;
+  state.teacherProfile = { uid: state.user.uid, ...teacherSnap.data() };
+  return state.teacherProfile;
+}
 
-  function getAttempts() {
-    return [...state.attempts].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+async function signInTeacher(email, password) {
+  await waitForAuthReady();
+  if (!email || !password) throw new Error("Enter the teacher email and password.");
+  if (state.user?.isAnonymous) {
+    await signOut(state.auth);
   }
-
-  function getAttemptsByClass(classCode) {
-    const target = normalizeClassCode(classCode);
-    if (target) loadClassData(target).catch(() => {});
-    return getAttempts().filter((attempt) => !target || normalizeClassCode(attempt.classCode) === target);
-  }
-
-  function getStudentsByClass(classCode) {
-    const target = normalizeClassCode(classCode);
-    if (target) loadClassData(target).catch(() => {});
-    const fromAttempts = getAttemptsByClass(target)
-      .map((attempt) => normalizeNickname(attempt.nickname))
-      .filter(Boolean);
-    const fromClasses = state.classes[target]?.students || [];
-    return [...new Set([...fromClasses, ...fromAttempts])].sort((a, b) => a.localeCompare(b));
-  }
-
-  function getStudentStats(classCode, nickname) {
-    const targetClass = normalizeClassCode(classCode);
-    const targetName = normalizeNickname(nickname);
-    if (targetClass) loadClassData(targetClass).catch(() => {});
-    const attempts = getAttemptsByClass(targetClass).filter((attempt) => normalizeNickname(attempt.nickname) === targetName);
-    return {
-      classCode: targetClass,
-      nickname: targetName,
-      attempts,
-      ...summarize(attempts)
-    };
-  }
-
-  function getSyllabusStats(classCode, nickname) {
-    const attempts = getStudentStats(classCode, nickname).attempts;
-    const groups = {};
-    attempts.forEach((attempt) => {
-      const key = attempt.syllabusId || "unknown";
-      if (!groups[key]) {
-        groups[key] = {
-          syllabusId: key,
-          syllabusLabel: attempt.syllabusLabel || "Unknown syllabus point",
-          attempts: 0,
-          correct: 0,
-          totalTimeSeconds: 0
-        };
-      }
-      groups[key].attempts += 1;
-      groups[key].totalTimeSeconds += Number(attempt.timeTakenSeconds || 0);
-      if (attempt.isCorrect) groups[key].correct += 1;
-    });
-    return Object.values(groups).map((row) => ({
-      syllabusId: row.syllabusId,
-      syllabusLabel: row.syllabusLabel,
-      attempts: row.attempts,
-      correct: row.correct,
-      accuracy: row.attempts ? row.correct / row.attempts : 0,
-      averageTimeSeconds: row.attempts ? row.totalTimeSeconds / row.attempts : 0
-    }));
-  }
-
-  function normalizeFirestoreAttempt(data, fallback = {}) {
-    return normalizeAttempt({
-      ...data,
-      attemptId: data.attemptId || fallback.attemptId,
-      classCode: data.classCode || fallback.classCode,
-      nickname: data.nickname || fallback.nickname
-    });
-  }
-
-  async function loadStudentAttempts(classCode, studentDoc) {
-    return withFirestore(async ({ collection, getDocs }) => {
-      const attemptsSnap = await getDocs(collection(studentDoc.ref, "attempts"));
-      attemptsSnap.forEach((attemptDoc) => {
-        const attempt = normalizeFirestoreAttempt(attemptDoc.data(), {
-          attemptId: attemptDoc.id,
-          classCode,
-          nickname: studentDoc.data().nickname
-        });
-        cacheAttempt(attempt);
-      });
-    });
-  }
-
-  async function loadClassData(classCode) {
-    const target = normalizeClassCode(classCode);
-    if (!target) return;
-    if (state.loadedClasses.has(target)) return;
-    if (state.loadingClasses.has(target)) return state.loadingClasses.get(target);
-
-    const promise = withFirestore(async ({ collection, getDoc, getDocs }) => {
-      const classSnap = await getDoc(classRef(state.modules.firestoreModule, target));
-      if (classSnap.exists()) {
-        state.classes[target] = {
-          classCode: target,
-          ...classSnap.data(),
-          students: state.classes[target]?.students || []
-        };
-      }
-
-      const studentsSnap = await getDocs(collection(state.db, "classes", target, "students"));
-      const loads = [];
-      studentsSnap.forEach((studentDoc) => {
-        const data = studentDoc.data();
-        const nickname = normalizeNickname(data.nickname || decodeURIComponent(studentDoc.id));
-        if (!state.classes[target]) state.classes[target] = { classCode: target, name: target, course: "AA", students: [] };
-        if (nickname && !state.classes[target].students.includes(nickname)) state.classes[target].students.push(nickname);
-        loads.push(loadStudentAttempts(target, studentDoc));
-      });
-      await Promise.all(loads);
-      if (state.classes[target]?.students) state.classes[target].students.sort((a, b) => a.localeCompare(b));
-      state.loadedClasses.add(target);
-      emit("aa-storage-updated", { mode: "firebase", classCode: target });
-    }).finally(() => {
-      state.loadingClasses.delete(target);
-    });
-
-    state.loadingClasses.set(target, promise);
-    return promise;
-  }
-
-  async function loadAllDataForTeacher() {
-    await withFirestore(async ({ collection, getDocs }) => {
-      const classesSnap = await getDocs(collection(state.db, "classes"));
-      const classCodes = [];
-      classesSnap.forEach((classDoc) => {
-        const classCode = normalizeClassCode(classDoc.id);
-        classCodes.push(classCode);
-        state.classes[classCode] = {
-          classCode,
-          ...classDoc.data(),
-          students: state.classes[classCode]?.students || []
-        };
-      });
-      await Promise.all(classCodes.map((classCode) => loadClassData(classCode)));
-      state.teacherLoaded = true;
-      emit("aa-storage-updated", { mode: "firebase" });
-    });
-    return getAttempts();
-  }
-
-  async function clearAllDataAsync() {
-    await withFirestore(async ({ collection, collectionGroup, deleteDoc, getDocs, writeBatch }) => {
-      const batch = writeBatch(state.db);
-      const attemptSnap = await getDocs(collectionGroup(state.db, "attempts"));
-      attemptSnap.forEach((attemptDoc) => batch.delete(attemptDoc.ref));
-      const statsSnap = await getDocs(collectionGroup(state.db, "syllabusStats"));
-      statsSnap.forEach((statsDoc) => batch.delete(statsDoc.ref));
-      await batch.commit();
-
-      const classCodes = Object.keys(state.classes);
-      await Promise.all(classCodes.map(async (classCode) => {
-        const studentsSnap = await getDocs(collection(state.db, "classes", classCode, "students"));
-        await Promise.all(studentsSnap.docs.map((studentDoc) => deleteDoc(studentDoc.ref)));
-      }));
-    });
-    state.attempts = [];
-    Object.values(state.classes).forEach((klass) => {
-      klass.students = [];
-    });
-    state.loadedClasses.clear();
-    emit("aa-storage-updated", { mode: "firebase" });
-  }
-
-  function clearAllData() {
-    state.attempts = [];
-    Object.values(state.classes).forEach((klass) => {
-      klass.students = [];
-    });
-    clearAllDataAsync().catch((error) => {
-      emit("aa-storage-error", { mode: "firebase", message: error.message });
-    });
-  }
-
-  function csvEscape(value) {
-    const text = Array.isArray(value) ? value.join("|") : String(value ?? "");
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-
-  function exportClassCSV(classCode) {
-    const rows = getAttemptsByClass(classCode);
-    const headers = [
-      "attemptId",
-      "course",
-      "classCode",
-      "nickname",
-      "courseLevel",
-      "questionId",
-      "topicId",
-      "topicName",
-      "syllabusId",
-      "syllabusLabel",
-      "level",
-      "difficulty",
-      "paperStyle",
-      "calculator",
-      "commandTerm",
-      "assessmentObjectiveTags",
-      "skillTags",
-      "misconceptionTags",
-      "selectedIndex",
-      "correctIndex",
-      "isCorrect",
-      "timeTakenSeconds",
-      "createdAt"
-    ];
-    return [
-      headers.map(csvEscape).join(","),
-      ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(","))
-    ].join("\n");
-  }
-
-  function publicUser() {
-    if (!state.user) return null;
-    return {
-      uid: state.user.uid,
-      email: state.user.email,
-      displayName: state.user.displayName
-    };
-  }
-
-  async function signInTeacher() {
-    await initializeFirebase();
-    if (!state.ready || !state.auth) throw state.initError || new Error("Firebase provider is not ready.");
-    const { GoogleAuthProvider, signInWithPopup } = state.modules.authModule;
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(state.auth, provider);
-    state.user = result.user;
-    await loadAllDataForTeacher();
-    emit("aa-auth-changed", { user: publicUser() });
-    return publicUser();
-  }
-
-  async function signOutTeacher() {
-    await initializeFirebase();
-    const { signOut } = state.modules.authModule;
+  const credential = await signInWithEmailAndPassword(state.auth, email, password);
+  state.user = credential.user;
+  console.log("Teacher signed in");
+  await verifyTeacher().catch(async (error) => {
     await signOut(state.auth);
     state.user = null;
-    state.teacherLoaded = false;
-    state.attempts = [];
-    emit("aa-auth-changed", { user: null });
-  }
+    throw error;
+  });
+  await loadAllDataForTeacher();
+  emit("aa-auth-changed", { user: publicUser() });
+  return publicUser();
+}
 
-  function getAuthUser() {
-    return publicUser();
-  }
+async function loadAllDataForTeacher() {
+  await verifyTeacher();
+  state.attempts = [];
+  state.classes = {};
+  state.loadedClasses.clear();
 
-  window.AAFirebaseProvider = {
-    saveAttempt,
-    getAttempts,
-    getAttemptsByClass,
-    getStudentsByClass,
-    getStudentStats,
-    getSyllabusStats,
-    clearAllData,
-    exportClassCSV,
-    initializeFirebase,
-    loadClassData,
-    loadAllDataForTeacher,
-    signInTeacher,
-    signOutTeacher,
-    getAuthUser,
-    isReady: () => state.ready,
-    getError: () => state.initError,
-    hasConfig: hasFirebaseConfig
-  };
+  const classesQuery = query(collection(state.db, "classes"), where("teacherUid", "==", state.user.uid));
+  const classesSnap = await getDocs(classesQuery);
+  const classCodes = [];
+  classesSnap.forEach((classDoc) => {
+    const classCode = normalizeClassCode(classDoc.id);
+    classCodes.push(classCode);
+    ensureClassCache(classCode, classDoc.data());
+  });
+  await Promise.all(classCodes.map((classCode) => loadClassRosterAndAttempts(classCode, true)));
+  console.log("Teacher classes loaded");
+  emit("aa-storage-updated", { mode: "firebase" });
+  return getAttempts();
+}
 
-  if ((window.AA_STORAGE_MODE || "local") === "firebase") {
-    initializeFirebase();
-  }
-})();
+async function signOutTeacher() {
+  await waitForAuthReady();
+  await signOut(state.auth);
+  state.user = null;
+  state.teacherVerified = false;
+  state.teacherProfile = null;
+  state.attempts = [];
+  state.classes = {};
+  state.loadedClasses.clear();
+  emit("aa-auth-changed", { user: null });
+}
+
+async function clearAllDataAsync() {
+  await verifyTeacher();
+  const classCodes = Object.keys(state.classes);
+  await Promise.all(classCodes.map(async (classCode) => {
+    const studentsSnap = await getDocs(collection(state.db, "classes", classCode, "students"));
+    await Promise.all(studentsSnap.docs.map(async (studentDoc) => {
+      const attemptsSnap = await getDocs(collection(studentDoc.ref, "attempts"));
+      const statsSnap = await getDocs(collection(studentDoc.ref, "syllabusStats"));
+      await Promise.all([
+        ...attemptsSnap.docs.map((attemptDoc) => deleteDoc(attemptDoc.ref)),
+        ...statsSnap.docs.map((statsDoc) => deleteDoc(statsDoc.ref))
+      ]);
+    }));
+  }));
+  console.log("Firebase teacher-visible attempts reset");
+}
+
+function clearAllData() {
+  state.attempts = [];
+  Object.values(state.classes).forEach((klass) => {
+    klass.students = [];
+    klass.studentProfiles = {};
+  });
+  clearAllDataAsync()
+    .then(() => emit("aa-storage-updated", { mode: "firebase" }))
+    .catch((error) => emit("aa-storage-error", { mode: "firebase", message: error.message }));
+}
+
+function csvEscape(value) {
+  const text = Array.isArray(value) ? value.join("|") : String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function exportClassCSV(classCode) {
+  const rows = getAttemptsByClass(classCode);
+  const headers = [
+    "attemptId",
+    "course",
+    "classCode",
+    "nickname",
+    "courseLevel",
+    "studentUid",
+    "questionId",
+    "topicId",
+    "topicName",
+    "syllabusId",
+    "syllabusLabel",
+    "level",
+    "difficulty",
+    "paperStyle",
+    "calculator",
+    "commandTerm",
+    "assessmentObjectiveTags",
+    "skillTags",
+    "misconceptionTags",
+    "selectedIndex",
+    "correctIndex",
+    "isCorrect",
+    "timeTakenSeconds",
+    "createdAt"
+  ];
+  return [
+    headers.map(csvEscape).join(","),
+    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(","))
+  ].join("\n");
+}
+
+function getClasses() {
+  return Object.values(state.classes).sort((a, b) => a.classCode.localeCompare(b.classCode));
+}
+
+export const AAFirebaseProvider = {
+  saveAttempt,
+  getAttempts,
+  getAttemptsByClass,
+  getStudentsByClass,
+  getStudentStats,
+  getSyllabusStats,
+  clearAllData,
+  exportClassCSV,
+  initializeFirebase,
+  joinStudentClass,
+  loadClassData,
+  loadAllDataForTeacher,
+  signInTeacher,
+  signOutTeacher,
+  getAuthUser: publicUser,
+  getClasses,
+  isReady: () => state.ready,
+  getError: () => state.initError,
+  hasConfig: hasFirebaseConfig
+};
+
+window.AAFirebaseProvider = AAFirebaseProvider;
+
+if ((window.AA_STORAGE_MODE || "local") === "firebase") {
+  initializeFirebase().catch((error) => {
+    console.error(error);
+  });
+}
+
+void addDoc;
+void updateDoc;
+void increment;
