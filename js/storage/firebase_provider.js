@@ -225,6 +225,14 @@ function syllabusStatsRef(classCode, studentUid, syllabusId) {
   );
 }
 
+function getCurrentTeacherUid() {
+  const currentUser = state.auth?.currentUser;
+  if (!currentUser || currentUser.isAnonymous) {
+    throw new Error("Teacher sign-in required.");
+  }
+  return currentUser.uid;
+}
+
 async function initializeFirebase() {
   if (state.readyPromise) return state.readyPromise;
 
@@ -469,13 +477,15 @@ async function loadCurrentStudentClass(classCode) {
   await loadStudentAttempts(state.studentProfile.classCode, state.studentProfile.uid, state.studentProfile);
 }
 
-async function loadClassRosterAndAttempts(classCode, force = false) {
+async function loadClassRosterAndAttempts(classCode, options = {}) {
   const target = normalizeClassCode(classCode);
+  const force = Boolean(options.force);
   if (!target) return;
   if (!force && state.loadedClasses.has(target)) return;
 
-  const classSnap = await getDoc(classRef(target));
-  if (classSnap.exists()) ensureClassCache(target, classSnap.data());
+  if (options.classData) {
+    ensureClassCache(target, options.classData);
+  }
 
   const studentsSnap = await getDocs(collection(state.db, "classes", target, "students"));
   await Promise.all(studentsSnap.docs.map(async (studentDoc) => {
@@ -511,18 +521,34 @@ async function loadClassData(classCode) {
 
 async function verifyTeacher() {
   await waitForAuthReady();
-  if (!state.user || state.user.isAnonymous) {
-    throw new Error("Teacher sign-in required.");
-  }
-  const teacherSnap = await getDoc(doc(state.db, "teachers", state.user.uid));
+  const teacherUid = getCurrentTeacherUid();
+  console.log("signed-in teacher uid", teacherUid);
+  const teacherRef = doc(state.db, "teachers", teacherUid);
+  const teacherSnap = await getDoc(teacherRef);
+  console.log("teacher document exists", teacherSnap.exists());
   if (!teacherSnap.exists()) {
     state.teacherVerified = false;
     state.teacherProfile = null;
     throw new Error("This account is not registered as a teacher.");
   }
   state.teacherVerified = true;
-  state.teacherProfile = { uid: state.user.uid, ...teacherSnap.data() };
+  state.teacherProfile = { uid: teacherUid, ...teacherSnap.data() };
   return state.teacherProfile;
+}
+
+async function getTeacherClasses() {
+  await verifyTeacher();
+  const teacherUid = getCurrentTeacherUid();
+  const q = query(
+    collection(state.db, "classes"),
+    where("teacherUid", "==", teacherUid)
+  );
+  const snapshot = await getDocs(q);
+  console.log("number of teacher classes found", snapshot.size);
+  return snapshot.docs.map((classDoc) => ({
+    classCode: normalizeClassCode(classDoc.id),
+    data: classDoc.data()
+  }));
 }
 
 async function signInTeacher(email, password) {
@@ -545,20 +571,18 @@ async function signInTeacher(email, password) {
 }
 
 async function loadAllDataForTeacher() {
-  await verifyTeacher();
+  const teacherClasses = await getTeacherClasses();
   state.attempts = [];
   state.classes = {};
   state.loadedClasses.clear();
 
-  const classesQuery = query(collection(state.db, "classes"), where("teacherUid", "==", state.user.uid));
-  const classesSnap = await getDocs(classesQuery);
-  const classCodes = [];
-  classesSnap.forEach((classDoc) => {
-    const classCode = normalizeClassCode(classDoc.id);
-    classCodes.push(classCode);
-    ensureClassCache(classCode, classDoc.data());
+  teacherClasses.forEach((klass) => {
+    ensureClassCache(klass.classCode, klass.data);
   });
-  await Promise.all(classCodes.map((classCode) => loadClassRosterAndAttempts(classCode, true)));
+  await Promise.all(teacherClasses.map((klass) => loadClassRosterAndAttempts(klass.classCode, {
+    force: true,
+    classData: klass.data
+  })));
   console.log("Teacher classes loaded");
   emit("aa-storage-updated", { mode: "firebase" });
   return getAttempts();
@@ -660,6 +684,7 @@ export const AAFirebaseProvider = {
   joinStudentClass,
   loadClassData,
   loadAllDataForTeacher,
+  getTeacherClasses,
   signInTeacher,
   signOutTeacher,
   getAuthUser: publicUser,
