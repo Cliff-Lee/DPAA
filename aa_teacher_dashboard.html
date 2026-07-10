@@ -7,14 +7,11 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/aa_styles.css">
   <script defer src="data/aa_syllabus.js"></script>
-  <script defer src="js/storage/storage_mode.js"></script>
-  <script defer src="js/storage/storage_interface.js"></script>
-  <script defer src="js/storage/local_storage_provider.js"></script>
-  <script defer src="js/storage/firebase_provider.js"></script>
-  <script defer src="js/storage/storage_provider_selector.js"></script>
+  <script type="module" src="js/storage/storage_manager.js"></script>
   <script defer src="js/aa_progress_engine.js"></script>
   <script defer src="js/aa_recommendations.js"></script>
   <script defer src="js/aa_ui_helpers.js"></script>
+  <script defer src="js/aa_app.js"></script>
   <script defer src="js/pages/aa_teacher_dashboard_page.js"></script>
 </head>
 <body>
@@ -23,7 +20,7 @@
       <a class="back-link" href="aa_index.html">Home</a>
       <div>
         <p class="eyebrow">Teacher dashboard</p>
-        <h1>Local AA Class Progress</h1>
+        <h1>AA Class Progress</h1>
       </div>
     </header>
 
@@ -33,9 +30,21 @@
         <h2>Sign in to view Firebase class data</h2>
         <p id="teacherAuthStatus" class="muted">Teacher dashboard access is required when Firebase storage mode is active.</p>
       </div>
-      <div class="button-row">
-        <button id="teacherSignInButton" class="primary-button" type="button">Sign in with Google</button>
-        <button id="teacherSignOutButton" class="secondary-button hidden" type="button">Sign out</button>
+      <form id="teacherLoginForm" class="teacher-login-form">
+        <label>
+          <span>Email</span>
+          <input id="teacherEmail" type="email" autocomplete="username" placeholder="teacher@example.com">
+        </label>
+        <label>
+          <span>Password</span>
+          <input id="teacherPassword" type="password" autocomplete="current-password" placeholder="Password">
+        </label>
+        <div class="button-row">
+          <button id="teacherSignInButton" class="primary-button" type="submit">Sign in</button>
+        </div>
+      </form>
+      <div id="teacherSignedInActions" class="button-row hidden">
+        <button id="teacherSignOutButton" class="secondary-button" type="button">Sign out</button>
       </div>
     </section>
 
