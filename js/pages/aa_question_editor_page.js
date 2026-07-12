@@ -185,8 +185,8 @@
     if (question.examSection === "Section B" && Number(question.totalMarks) < 15) {
       errors.push("Section B questions should be at least 15 marks");
     }
-    if (question.examSection === "Paper 3" && Number(question.totalMarks) < 20) {
-      errors.push("Paper 3 questions should be at least 20 marks");
+    if (question.examSection === "Paper 3" && Number(question.totalMarks) < 8) {
+      errors.push("Paper 3 family examples should be at least 8 marks");
     }
     if (!["not_allowed", "gdc_useful", "technology_required"].includes(question.calculator)) {
       errors.push("calculator must be not_allowed, gdc_useful or technology_required");
@@ -343,12 +343,12 @@
           <div class="meta-row">${AA_UI.questionBadges(question)}</div>
         </div>
         <p class="muted">${AA_UI.escapeHtml(question.syllabusId)} | ${AA_UI.escapeHtml(question.syllabusLabel)} | ${AA_UI.escapeHtml(question.examSection || "")}</p>
-        ${question.promptLatex ? `<div class="math-block">${question.promptLatex}</div>` : ""}
+        ${question.promptLatex ? `<div class="math-block">${AA_UI.escapeHtml(question.promptLatex)}</div>` : ""}
         ${AA_UI.renderDiagram(question.diagram)}
         <ol class="exam-parts" type="a">
           ${question.parts.map((part) => `
             <li>
-              <div class="math-block">${part.promptLatex}</div>
+              <div class="math-block">${AA_UI.escapeHtml(part.promptLatex)}</div>
               <span class="exam-marks">[${part.marks} mark${part.marks === 1 ? "" : "s"}]</span>
             </li>
           `).join("")}
@@ -366,7 +366,7 @@
           ${question.parts.map((part) => `
             <li>
               <p><strong>Markscheme [${part.marks}]:</strong> ${part.markschemeLatex}</p>
-              ${includeSolution ? `<p><strong>Worked solution:</strong> ${part.workedSolutionLatex}</p>` : ""}
+              ${includeSolution ? `<p><strong>Worked solution:</strong> ${AA_UI.escapeHtml(part.workedSolutionLatex)}</p>` : ""}
             </li>
           `).join("")}
         </ol>
