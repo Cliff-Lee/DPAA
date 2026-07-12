@@ -57,7 +57,7 @@
       populateSyllabusFilter();
       applyFilters();
     });
-    ["editorSearch", "editorSyllabusFilter", "editorPaperFilter", "editorSectionFilter", "editorCalculatorFilter", "editorDifficultyFilter"].forEach((id) => {
+    ["editorSearch", "editorSyllabusFilter", "editorPaperFilter", "editorSectionFilter", "editorCalculatorFilter", "editorDifficultyFilter", "editorStyleFilter", "editorMixedFilter", "editorRepresentationFilter"].forEach((id) => {
       AA_UI.byId(id).addEventListener("input", applyFilters);
     });
     AA_UI.byId("buildFilteredTestButton").addEventListener("click", buildTestFromFilters);
@@ -113,6 +113,9 @@
     const section = AA_UI.byId("editorSectionFilter").value;
     const calculator = AA_UI.byId("editorCalculatorFilter").value;
     const difficulty = AA_UI.byId("editorDifficultyFilter").value;
+    const style = AA_UI.byId("editorStyleFilter").value;
+    const mixed = AA_UI.byId("editorMixedFilter").value;
+    const representation = AA_UI.byId("editorRepresentationFilter").value;
 
     state.filtered = state.questions.filter((question) => {
       if (search) {
@@ -123,19 +126,29 @@
           question.syllabusLabel,
           question.topicName,
           question.examinerNotes,
+          question.questionStyle,
+          question.primaryTopic,
+          ...(question.secondaryTopics || []),
+          ...(question.syllabusIds || []),
           ...(question.skillTags || []),
           ...(question.misconceptionTags || []),
           ...(question.parts || []).flatMap((part) => [part.promptLatex, part.markschemeLatex, part.workedSolutionLatex])
         ].join(" ").toLowerCase();
         if (!haystack.includes(search)) return false;
       }
-      if (topicId !== "all" && question.topicId !== topicId) return false;
-      if (syllabusId !== "all" && question.syllabusId !== syllabusId) return false;
+      if (topicId !== "all" && question.topicId !== topicId && !(question.secondarySyllabusIds || []).some((id) => AA_UI.getSyllabusPoint(id)?.topicId === topicId)) return false;
+      if (syllabusId !== "all" && !(question.syllabusIds || [question.syllabusId]).includes(syllabusId)) return false;
       if (level !== "all" && question.level !== level) return false;
       if (paper !== "all" && question.paperStyle !== paper) return false;
       if (section !== "all" && question.examSection !== section) return false;
       if (calculator !== "all" && question.calculator !== calculator) return false;
       if (difficulty !== "all" && String(question.difficulty) !== difficulty) return false;
+      if (style !== "all" && question.questionStyle !== style) return false;
+      if (mixed === "mixed" && !question.mixedTopic) return false;
+      if (mixed === "single" && question.mixedTopic) return false;
+      const hasRepresentation = Boolean(question.diagram) || question.diagramOrDataRequirement !== "none";
+      if (representation === "present" && !hasRepresentation) return false;
+      if (representation === "none" && hasRepresentation) return false;
       return true;
     });
 
@@ -152,7 +165,10 @@
       "id", "course", "level", "topicId", "topicName", "syllabusId", "syllabusLabel",
       "difficulty", "paperStyle", "examSection", "calculator", "commandTerm", "assessmentObjectiveTags",
       "skillTags", "misconceptionTags", "promptLatex", "diagram", "parts",
-      "totalMarks", "estimatedTimeMinutes", "examinerNotes", "workedSolutionLatex", "markschemeLatex"
+      "totalMarks", "estimatedTimeMinutes", "examinerNotes", "workedSolutionLatex", "markschemeLatex",
+      "primarySyllabusId", "secondarySyllabusIds", "syllabusIds", "mixedTopic", "questionStyle",
+      "primaryTopic", "secondaryTopics", "diagramOrDataRequirement", "templateFamilyId", "version",
+      "validationStatus"
     ];
     const errors = [];
     required.forEach((field) => {
