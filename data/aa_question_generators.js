@@ -69,6 +69,8 @@
       secondaryTopics: [],
       diagramOrDataRequirement: config.diagram?.type || "none",
       templateFamilyId: `AA-GEN-${config.syllabusId}-${String(config.id).split("-")[2] || "PRACTICE"}`,
+      familyId: `AA-GEN-${config.syllabusId}-${String(config.id).split("-")[2] || "PRACTICE"}`,
+      reasoningSignature: `generator:${config.syllabusId}:${String(config.id).split("-")[2] || "practice"}`,
       version: "2.0.0",
       validationStatus: "generated-valid",
       difficulty: config.difficulty,

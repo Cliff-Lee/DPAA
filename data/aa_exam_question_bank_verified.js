@@ -563,20 +563,24 @@
   }
 
   function formatDetailedMarkscheme(guidance) {
+    const safe = (value) => String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
     const annotationLines = guidance.markAnnotations
-      .map((annotation) => `<strong>${annotation.code}:</strong> ${annotation.description}`)
+      .map((annotation) => `<strong>${safe(annotation.code)}:</strong> ${safe(annotation.description)}`)
       .join("<br>");
     const agLine = guidance.answerGiven
       ? "<br><strong>AG:</strong> The stated result is given in the question. Reproducing it without the required derivation earns no accuracy mark."
       : "";
     return [
-      `<strong>Question/part:</strong> ${guidance.questionPart}`,
-      `<strong>Expected working:</strong> ${guidance.expectedWorking}`,
+      `<strong>Question/part:</strong> ${safe(guidance.questionPart)}`,
+      `<strong>Expected working:</strong> ${safe(guidance.expectedWorking)}`,
       annotationLines + agLine,
-      `<strong>FT guidance:</strong> ${guidance.followThrough}`,
-      `<strong>Alternative methods/forms accepted:</strong> ${guidance.alternatives}`,
-      `<strong>Common errors and how to mark them:</strong> ${guidance.commonErrors}`,
-      `<strong>Final acceptable answers:</strong> ${guidance.finalAnswers}`,
+      `<strong>FT guidance:</strong> ${safe(guidance.followThrough)}`,
+      `<strong>Alternative methods/forms accepted:</strong> ${safe(guidance.alternatives)}`,
+      `<strong>Common errors and how to mark them:</strong> ${safe(guidance.commonErrors)}`,
+      `<strong>Final acceptable answers:</strong> ${safe(guidance.finalAnswers)}`,
       `<strong>Total:</strong> [${guidance.total} mark${guidance.total === 1 ? "" : "s"}]`
     ].join("<br>");
   }
@@ -597,6 +601,20 @@
       || (/<table\b/i.test(question.promptLatex || "") ? "embedded-data" : "none");
     question.templateFamilyId = question.templateFamilyId
       || `AA-TASK-${question.syllabusId}-${questionNumber % 2 === 0 ? "02" : "01"}`;
+    question.familyId = question.familyId || question.templateFamilyId;
+    question.reasoningSignature = question.reasoningSignature
+      || `${question.templateFamilyId}::${(question.skillTags || []).slice(0, 3).join("+") || question.syllabusId}`;
+    question.mathematicalGoal = question.mathematicalGoal || question.syllabusLabel;
+    question.requiredPriorKnowledge = question.requiredPriorKnowledge || [...(question.skillTags || [])];
+    question.primarySolutionStrategy = question.primarySolutionStrategy || (question.skillTags || [question.commandTerm])[0];
+    question.acceptableAlternativeStrategies = question.acceptableAlternativeStrategies || ["Any mathematically equivalent complete method"];
+    question.misconceptionsTested = question.misconceptionsTested || [...(question.misconceptionTags || [])];
+    question.representationType = question.representationType || (question.diagram?.type || "symbolic");
+    question.contextType = question.contextType || "abstract";
+    question.parameterConstraints = question.parameterConstraints || { parameterized: false, constraints: ["Fixed validated exemplar"] };
+    question.degenerateCases = question.degenerateCases || [];
+    question.diagramDependency = question.diagramDependency || (question.diagram ? "supporting" : "none");
+    question.answerVerificationMethod = question.answerVerificationMethod || "Substitute the final result into the original conditions";
     question.version = question.version || "2.0.0";
     question.validationStatus = question.validationStatus || "validated";
     question.promptLatex = improveQuestionLead(question);

@@ -683,6 +683,8 @@
       secondaryTopics: [],
       diagramOrDataRequirement: "none",
       templateFamilyId: "AA-TASK-" + point.id + "-" + (index % 2 === 0 ? "01" : "02"),
+      familyId: "AA-TASK-" + point.id + "-" + (index % 2 === 0 ? "01" : "02"),
+      reasoningSignature: "AA-TASK-" + point.id + "-" + (index % 2 === 0 ? "01" : "02") + "::" + (point.skills || []).slice(0, 3).join("+"),
       version: "2.0.0",
       validationStatus: "validated",
       difficulty: meta.difficulty,
