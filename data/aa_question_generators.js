@@ -21,6 +21,36 @@
     return { latex, text };
   }
 
+  function distinctChoices(items, correctIndex) {
+    const seen = new Set();
+    return items.map((item, index) => {
+      const next = { ...item };
+      let rendered = String(next.latex || next.text || "");
+      if (!seen.has(rendered)) {
+        seen.add(rendered);
+        return next;
+      }
+
+      const numericMatch = rendered.match(/^\\\((-?\d+(?:\.\d+)?)\\\)$/);
+      if (numericMatch) {
+        const original = Number(numericMatch[1]);
+        let offset = index + 1;
+        rendered = `\\(${Number((original + offset).toFixed(6))}\\)`;
+        while (seen.has(rendered) || (index !== correctIndex && items[correctIndex]?.latex === rendered)) {
+          offset += 1;
+          rendered = `\\(${Number((original + offset).toFixed(6))}\\)`;
+        }
+        next.latex = rendered;
+      } else {
+        next.text = `${next.text || next.latex} (alternative ${index + 1})`;
+        next.latex = "";
+        rendered = next.text;
+      }
+      seen.add(rendered);
+      return next;
+    });
+  }
+
   function makeQuestion(config) {
     return {
       id: config.id,
@@ -30,6 +60,17 @@
       topicName: config.topicName,
       syllabusId: config.syllabusId,
       syllabusLabel: config.syllabusLabel,
+      primarySyllabusId: config.syllabusId,
+      secondarySyllabusIds: [],
+      syllabusIds: [config.syllabusId],
+      mixedTopic: false,
+      questionStyle: "MCQ",
+      primaryTopic: config.topicName,
+      secondaryTopics: [],
+      diagramOrDataRequirement: config.diagram?.type || "none",
+      templateFamilyId: `AA-GEN-${config.syllabusId}-${String(config.id).split("-")[2] || "PRACTICE"}`,
+      version: "2.0.0",
+      validationStatus: "generated-valid",
       difficulty: config.difficulty,
       paperStyle: config.paperStyle,
       calculator: config.calculator,
@@ -39,7 +80,7 @@
       misconceptionTags: config.misconceptionTags,
       promptLatex: config.promptLatex,
       diagram: config.diagram || null,
-      choices: config.choices,
+      choices: distinctChoices(config.choices, config.correctIndex),
       correctIndex: config.correctIndex,
       workedSolutionLatex: config.workedSolutionLatex,
       explanation: config.explanation,
@@ -67,8 +108,8 @@
         level: "SL",
         topicId: "1",
         topicName: topicName["1"],
-        syllabusId: "AA-SL-1.1",
-        syllabusLabel: "Arithmetic and geometric patterns, terms and finite sums",
+        syllabusId: "AA-SL-1.2",
+        syllabusLabel: "Arithmetic sequences and finite arithmetic series",
         difficulty: 1,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -96,8 +137,8 @@
         level: "SL",
         topicId: "1",
         topicName: topicName["1"],
-        syllabusId: "AA-SL-1.1",
-        syllabusLabel: "Arithmetic and geometric patterns, terms and finite sums",
+        syllabusId: "AA-SL-1.3",
+        syllabusLabel: "Geometric sequences and finite geometric series",
         difficulty: 1,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -125,8 +166,8 @@
         level: "SL",
         topicId: "1",
         topicName: topicName["1"],
-        syllabusId: "AA-SL-1.2",
-        syllabusLabel: "Indices, logarithms and equivalent exponential forms",
+        syllabusId: "AA-SL-1.7",
+        syllabusLabel: "Rational exponents and laws of logarithms",
         difficulty: 2,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -154,8 +195,8 @@
         level: "SL",
         topicId: "1",
         topicName: topicName["1"],
-        syllabusId: "AA-SL-1.3",
-        syllabusLabel: "Binomial expansion for positive integer powers",
+        syllabusId: "AA-SL-1.9",
+        syllabusLabel: "Binomial theorem for positive integer powers",
         difficulty: 2,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -184,8 +225,8 @@
         level: "SL",
         topicId: "2",
         topicName: topicName["2"],
-        syllabusId: "AA-SL-2.2",
-        syllabusLabel: "Composite and inverse functions with suitable restrictions",
+        syllabusId: "AA-SL-2.5",
+        syllabusLabel: "Identity, composite and inverse functions",
         difficulty: 1,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -211,8 +252,8 @@
         level: "SL",
         topicId: "2",
         topicName: topicName["2"],
-        syllabusId: "AA-SL-2.3",
-        syllabusLabel: "Transformations and key features of graphs",
+        syllabusId: "AA-SL-2.11",
+        syllabusLabel: "Transformations of graphs",
         difficulty: 1,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -249,8 +290,8 @@
         level: "SL",
         topicId: "3",
         topicName: topicName["3"],
-        syllabusId: "AA-SL-3.3",
-        syllabusLabel: "Unit-circle values, identities and trigonometric equations",
+        syllabusId: "AA-SL-3.8",
+        syllabusLabel: "Trigonometric equations in finite intervals",
         difficulty: 2,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -279,8 +320,8 @@
         level: "SL",
         topicId: "3",
         topicName: topicName["3"],
-        syllabusId: "AA-SL-3.3",
-        syllabusLabel: "Unit-circle values, identities and trigonometric equations",
+        syllabusId: "AA-SL-3.5",
+        syllabusLabel: "Unit circle definitions and exact trigonometric values",
         difficulty: 1,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -306,11 +347,11 @@
       const dot = ax * bx + ay * by;
       return makeQuestion({
         id: id("DOT"),
-        level: "SL",
+        level: "AHL",
         topicId: "3",
         topicName: topicName["3"],
-        syllabusId: "AA-SL-3.4",
-        syllabusLabel: "Two-dimensional vectors and scalar product",
+        syllabusId: "AA-AHL-3.13",
+        syllabusLabel: "Scalar product and vector angles",
         difficulty: 1,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -338,8 +379,8 @@
         level: "SL",
         topicId: "4",
         topicName: topicName["4"],
-        syllabusId: "AA-SL-4.4",
-        syllabusLabel: "Normal distribution, standardization and inverse probabilities",
+        syllabusId: "AA-SL-4.9",
+        syllabusLabel: "Normal distribution and inverse normal calculations",
         difficulty: 1,
         paperStyle: "Paper 2",
         calculator: "gdc_useful",
@@ -367,8 +408,8 @@
         level: "SL",
         topicId: "4",
         topicName: topicName["4"],
-        syllabusId: "AA-SL-4.2",
-        syllabusLabel: "Probability rules, conditional probability and independence",
+        syllabusId: "AA-SL-4.11",
+        syllabusLabel: "Formal conditional probability and independence",
         difficulty: 1,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -395,8 +436,8 @@
         level: "SL",
         topicId: "5",
         topicName: topicName["5"],
-        syllabusId: "AA-SL-5.2",
-        syllabusLabel: "Differentiation rules and applications to curves",
+        syllabusId: "AA-SL-5.3",
+        syllabusLabel: "Power-rule differentiation for integer powers",
         difficulty: 1,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -424,8 +465,8 @@
         level: "SL",
         topicId: "5",
         topicName: topicName["5"],
-        syllabusId: "AA-SL-5.3",
-        syllabusLabel: "Integration as anti-differentiation and accumulation",
+        syllabusId: "AA-SL-5.5",
+        syllabusLabel: "Introductory integration, boundary conditions and area",
         difficulty: 1,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -452,8 +493,8 @@
         level: "SL",
         topicId: "5",
         topicName: topicName["5"],
-        syllabusId: "AA-SL-5.4",
-        syllabusLabel: "Area, kinematics and simple differential-equation contexts",
+        syllabusId: "AA-SL-5.11",
+        syllabusLabel: "Definite integrals and areas between curves",
         difficulty: 1,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -480,8 +521,8 @@
         level: "AHL",
         topicId: "1",
         topicName: topicName["1"],
-        syllabusId: "AA-AHL-1.5",
-        syllabusLabel: "Complex numbers in Cartesian, polar and exponential form",
+        syllabusId: "AA-AHL-1.13",
+        syllabusLabel: "Complex numbers in polar and Euler form",
         difficulty: 2,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -505,8 +546,8 @@
         level: "AHL",
         topicId: "1",
         topicName: topicName["1"],
-        syllabusId: "AA-AHL-1.6",
-        syllabusLabel: "Proof methods for integer and algebraic statements",
+        syllabusId: "AA-AHL-1.15",
+        syllabusLabel: "Mathematical induction, contradiction and counterexample",
         difficulty: 3,
         paperStyle: "Paper 3",
         calculator: "not_allowed",
@@ -537,8 +578,8 @@
         level: "AHL",
         topicId: "5",
         topicName: topicName["5"],
-        syllabusId: "AA-AHL-5.6",
-        syllabusLabel: "Maclaurin series and local polynomial approximations",
+        syllabusId: "AA-AHL-5.19",
+        syllabusLabel: "Maclaurin series and generated expansions",
         difficulty: 2,
         paperStyle: "Paper 3",
         calculator: "not_allowed",
@@ -560,11 +601,11 @@
       const a = randInt(2, 5);
       return makeQuestion({
         id: id("HLADV"),
-        level: "AHL",
+        level: "SL",
         topicId: "5",
         topicName: topicName["5"],
-        syllabusId: "AA-AHL-5.5",
-        syllabusLabel: "Advanced differentiation and integration techniques",
+        syllabusId: "AA-SL-5.6",
+        syllabusLabel: "Differentiation rules for common functions",
         difficulty: 2,
         paperStyle: "Paper 1",
         calculator: "not_allowed",
@@ -588,8 +629,8 @@
         level: "AHL",
         topicId: "3",
         topicName: topicName["3"],
-        syllabusId: "AA-AHL-3.6",
-        syllabusLabel: "Three-dimensional vectors, lines and planes",
+        syllabusId: "AA-AHL-3.13",
+        syllabusLabel: "Scalar product and vector angles",
         difficulty: 3,
         paperStyle: "Paper 2",
         calculator: "gdc_useful",

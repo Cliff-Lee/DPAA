@@ -582,6 +582,23 @@
   }
 
   function enhanceQuestion(question) {
+    const questionNumber = Number(question.id.match(/-Q(\d+)$/)?.[1] || 1);
+    question.primarySyllabusId = question.primarySyllabusId || question.syllabusId;
+    question.secondarySyllabusIds = question.secondarySyllabusIds || [];
+    question.syllabusIds = question.syllabusIds || [question.primarySyllabusId, ...question.secondarySyllabusIds];
+    question.mixedTopic = Boolean(question.mixedTopic || question.secondarySyllabusIds.length);
+    question.questionStyle = question.questionStyle || (question.paperStyle === "Paper 3"
+      ? "extended-response"
+      : (question.examSection === "Section B" ? "structured-multi-part" : "short-structured"));
+    question.primaryTopic = question.primaryTopic || question.topicName;
+    question.secondaryTopics = question.secondaryTopics || [];
+    question.diagramOrDataRequirement = question.diagramOrDataRequirement
+      || question.diagram?.type
+      || (/<table\b/i.test(question.promptLatex || "") ? "embedded-data" : "none");
+    question.templateFamilyId = question.templateFamilyId
+      || `AA-TASK-${question.syllabusId}-${questionNumber % 2 === 0 ? "02" : "01"}`;
+    question.version = question.version || "2.0.0";
+    question.validationStatus = question.validationStatus || "validated";
     question.promptLatex = improveQuestionLead(question);
     question.parts = question.parts.map((part, partIndex) => {
       const originalMarkscheme = part.markschemeLatex;
@@ -892,6 +909,7 @@
     throw new Error(`Missing verified exam task blueprints: ${missing.join(", ")}`);
   }
 
+  window.AAEnhanceExamQuestion = enhanceQuestion;
   window.AA_EXAM_QUESTION_BANK_SEED = points.flatMap((point) =>
     Array.from({ length: 10 }, (_, index) => buildQuestion(point, index))
   );
