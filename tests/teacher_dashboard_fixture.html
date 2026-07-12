@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teacher Dashboard Fixture</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../css/aa_styles.css?v=5">
+  <script defer src="../data/aa_syllabus.js"></script>
+  <script defer src="teacher_dashboard_fixture_storage.js"></script>
+  <script defer src="../js/aa_progress_engine.js?v=2"></script>
+  <script defer src="../js/aa_recommendations.js"></script>
+  <script defer src="../js/aa_ui_helpers.js"></script>
+  <script defer src="../js/pages/aa_teacher_dashboard_page.js?v=3"></script>
+</head>
+<body class="teacher-dashboard">
+  <main class="app-shell">
+    <header class="page-header"><a class="back-link" href="#">Home</a><div><p class="eyebrow">Teacher dashboard</p><h1>AA Class Progress</h1></div></header>
+    <section id="teacherAuthPanel" class="hidden"><p id="teacherAuthStatus"></p><div id="publicDemoEntry"></div><form id="teacherLoginForm"><input id="teacherEmail"><input id="teacherPassword"><button id="teacherSignInButton"></button></form><div id="teacherSignedInActions"><button id="teacherSignOutButton"></button></div><button id="tryPublicDemoButton"></button></section>
+    <section id="publicDemoBanner" class="hidden"><button id="refreshPublicDemoButton"></button><button id="switchToPremiumButton"></button></section>
+    <section class="card filter-card dashboard-content">
+      <div class="filter-grid">
+        <label><span>Class</span><select id="classFilter"><option value="">All classes</option></select></label>
+        <div class="filter-action"><button id="openCreateClassButton" class="primary-button" type="button">+ Create class</button></div>
+        <label><span>Course level</span><select id="levelFilter"><option value="all">SL and HL</option><option value="SL">SL only</option><option value="HL">HL only</option></select></label>
+        <label><span>Topic</span><select id="topicFilter"></select></label>
+        <label><span>Content level</span><select id="contentLevelFilter"><option value="all">SL and AHL</option><option value="SL">SL only</option><option value="AHL">AHL only</option></select></label>
+        <label><span>Paper</span><select id="paperFilter"><option value="all">All papers</option><option>Paper 1</option><option>Paper 2</option><option>Paper 3</option></select></label>
+        <label><span>Time</span><select id="timeFilter"><option value="all">All time</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+      </div>
+      <section id="createClassPanel" class="hidden"><form id="createClassForm"><input id="newClassName"><input id="newClassCode"><button id="createClassSubmitButton"></button><button id="cancelCreateClassButton" type="button"></button></form><p id="createClassStatus"></p></section>
+      <section class="class-management-area"><p id="classLoadingStatus"></p><div id="myClassesList"></div></section>
+      <div class="button-row"><button id="exportCsvButton" class="secondary-button">Export attempt data</button><button id="resetDashboardButton" class="danger-button">Reset data</button></div>
+    </section>
+    <section class="card dashboard-content"><h2>Class overview</h2><div id="overviewMetrics" class="metric-grid"></div></section>
+    <section class="dashboard-grid dashboard-content">
+      <div class="card"><h2>Weakest topics</h2><div id="weakestTopics"></div></div>
+      <div class="card"><h2>Weakest syllabus points</h2><div id="weakestSyllabus"></div></div>
+      <div class="card"><h2>Misconception summary</h2><div id="misconceptionSummary"></div></div>
+      <div class="card"><h2>Readiness</h2><div id="readinessCards" class="readiness-grid"></div></div>
+    </section>
+    <section class="card table-card dashboard-content"><h2>Students</h2><div class="table-wrap"><table><thead><tr><th>Class</th><th>Student</th><th>Level</th><th>Attempts</th><th>Accuracy</th><th>Avg time</th><th>Mastery</th></tr></thead><tbody id="studentTableBody"></tbody></table></div></section>
+    <section class="card dashboard-content heatmap-card" aria-labelledby="heatmapTitle">
+      <div class="section-heading heatmap-section-heading">
+        <div><p class="eyebrow">Syllabus coverage</p><h2 id="heatmapTitle">Student-by-syllabus heatmap</h2><p class="muted heatmap-description">Accuracy for the current dashboard filters.</p></div>
+        <div class="heatmap-export-actions"><button id="downloadHeatmapCsvButton" class="secondary-button download-button" aria-label="Download the displayed student-by-syllabus heatmap as CSV" disabled><span aria-hidden="true">↓</span>Download CSV</button><p id="heatmapExportStatus" class="status-line heatmap-export-status" aria-live="polite"></p></div>
+      </div>
+      <div class="heatmap-legend" aria-label="Heatmap accuracy legend"><span><i class="heatmap-legend-swatch heatmap-no-data"></i>No data</span><span><i class="heatmap-legend-swatch heatmap-low"></i>Low 0–39%</span><span><i class="heatmap-legend-swatch heatmap-developing"></i>Developing 40–69%</span><span><i class="heatmap-legend-swatch heatmap-secure"></i>Secure 70–84%</span><span><i class="heatmap-legend-swatch heatmap-strong"></i>Strong 85–100%</span></div>
+      <div id="heatmap" class="heatmap-region"></div>
+    </section>
+  </main>
+</body>
+</html>
