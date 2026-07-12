@@ -1100,6 +1100,16 @@ th {
   gap: 18px;
 }
 
+.editor-layout > *,
+.editor-sidebar,
+.question-preview,
+.editor-filters label,
+.editor-filters input,
+.editor-filters select {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .question-list-header {
   display: flex;
   justify-content: space-between;
@@ -1231,6 +1241,47 @@ th {
   display: block;
   width: 100%;
   max-height: 240px;
+}
+
+.diagram figcaption {
+  padding: 12px 14px 0;
+  color: var(--ink-muted);
+  font-weight: 700;
+}
+
+.diagram-table-scroll {
+  overflow-x: auto;
+  padding: 12px 14px 14px;
+}
+
+.diagram-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+.diagram-table th,
+.diagram-table td {
+  border: 1px solid var(--line);
+  padding: 9px 12px;
+  white-space: nowrap;
+}
+
+.diagram-table th {
+  background: var(--surface-strong);
+  font-weight: 800;
+}
+
+.cut-line,
+.dimension-line {
+  stroke: #475467;
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.cut-line {
+  stroke-dasharray: 5 4;
 }
 
 .axis,
