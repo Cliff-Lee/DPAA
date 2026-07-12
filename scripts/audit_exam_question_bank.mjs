@@ -4,7 +4,8 @@ import vm from "node:vm";
 const sourceFiles = [
   "data/aa_syllabus.js",
   "data/aa_exam_question_bank_reconciled.js",
-  "data/aa_exam_question_bank_verified.js"
+  "data/aa_exam_question_bank_verified.js",
+  "data/aa_exam_question_bank_curated_expansion.js"
 ];
 
 const context = vm.createContext({ window: {}, console });
@@ -83,7 +84,7 @@ questions.forEach((question) => {
 
 const wrongCoverage = syllabusPoints
   .map((point) => ({ id: point.id, count: countByPoint.get(point.id) || 0 }))
-  .filter((row) => row.count !== 10);
+  .filter((row) => row.count < 10);
 const duplicateIds = duplicateGroups((question) => question.id);
 const duplicateQuestions = duplicateGroups((question) => normalize(questionText(question)));
 const duplicatePrimaryParts = duplicateGroups((question) => normalize(question.parts?.[0]?.promptLatex));
@@ -149,7 +150,7 @@ const markAnnotationTotals = allParts.reduce((totals, { part }) => {
 const report = {
   questions: questions.length,
   syllabusPoints: syllabusPoints.length,
-  expectedQuestions: syllabusPoints.length * 10,
+  baselineMinimumQuestions: syllabusPoints.length * 10,
   wrongCoverage,
   duplicateIds,
   duplicateQuestions,
@@ -170,7 +171,7 @@ const report = {
 
 console.log(JSON.stringify(report, null, 2));
 
-const failed = questions.length !== syllabusPoints.length * 10
+const failed = questions.length < syllabusPoints.length * 10
   || wrongCoverage.length > 0
   || duplicateIds.length > 0
   || duplicateQuestions.length > 0
