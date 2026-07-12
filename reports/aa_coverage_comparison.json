@@ -1,0 +1,343 @@
+{
+  "generatedAt": "2026-07-12T09:48:21.134Z",
+  "changes": {
+    "totalStoredQuestions": {
+      "before": 1328,
+      "after": 1341,
+      "change": 13
+    },
+    "examQuestions": {
+      "before": 830,
+      "after": 843,
+      "change": 13
+    },
+    "mcqQuestions": {
+      "before": 498,
+      "after": 498,
+      "change": 0
+    },
+    "distinctMathematicalTemplates": {
+      "before": 166,
+      "after": 179,
+      "change": 13
+    },
+    "totalExamMarksAcrossBank": {
+      "before": 10499,
+      "after": 10706,
+      "change": 207
+    },
+    "mixedTopicQuestions": {
+      "before": 0,
+      "after": 13,
+      "change": 13
+    },
+    "questionsWithDiagrams": {
+      "before": 0,
+      "after": 7,
+      "change": 7
+    },
+    "questionsWithGraphsTablesOrData": {
+      "before": 292,
+      "after": 301,
+      "change": 9
+    },
+    "contextualQuestions": {
+      "before": 509,
+      "after": 517,
+      "change": 8
+    },
+    "completeMarkschemesOrSolutions": {
+      "before": 1328,
+      "after": 1341,
+      "change": 13
+    },
+    "duplicateIds": {
+      "before": 0,
+      "after": 0,
+      "change": 0
+    },
+    "generatorValidationErrors": {
+      "before": 720,
+      "after": 0,
+      "change": -720
+    }
+  },
+  "beforeDistribution": {
+    "level": {
+      "SL": 816,
+      "AHL": 512
+    },
+    "paper": {
+      "Paper 1": 632,
+      "Paper 2": 600,
+      "Paper 3": 96
+    },
+    "difficulty": {
+      "1": 383,
+      "2": 415,
+      "3": 530
+    },
+    "style": {
+      "short-structured": 383,
+      "structured-multi-part": 383,
+      "extended-response": 64,
+      "MCQ": 498
+    }
+  },
+  "afterDistribution": {
+    "level": {
+      "SL": 822,
+      "AHL": 519
+    },
+    "paper": {
+      "Paper 1": 638,
+      "Paper 2": 606,
+      "Paper 3": 97
+    },
+    "difficulty": {
+      "1": 383,
+      "2": 417,
+      "3": 538,
+      "4": 3
+    },
+    "style": {
+      "short-structured": 383,
+      "structured-multi-part": 387,
+      "extended-response": 65,
+      "modelling": 4,
+      "data-analysis": 1,
+      "proof-and-geometry": 1,
+      "challenging-unfamiliar": 1,
+      "numerical-and-analytic": 1,
+      "MCQ": 498
+    }
+  },
+  "distinctTemplateObjective": {
+    "objective": 500,
+    "achieved": 179,
+    "remaining": 321,
+    "status": "not yet met"
+  },
+  "remainingWeakAreas": [
+    {
+      "syllabusId": "AA-AHL-1.12",
+      "title": "Complex basics",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-2.12",
+      "title": "Polynomials",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-2.13",
+      "title": "Further rational",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-2.14",
+      "title": "Odd/even functions",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-2.15",
+      "title": "Function inequalities",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-2.16",
+      "title": "Modulus functions",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-3.11",
+      "title": "Further trig graphs",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-3.14",
+      "title": "Vector lines",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-3.17",
+      "title": "Planes",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-3.9",
+      "title": "Reciprocal trig",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-4.14",
+      "title": "Continuous distributions",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-5.12",
+      "title": "First principles",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-AHL-5.15",
+      "title": "Further calculus rules",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-SL-1.2",
+      "title": "Arithmetic sequences",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-SL-1.5",
+      "title": "Exponents and logs",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-SL-2.11",
+      "title": "Transformations",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-SL-2.2",
+      "title": "Function basics",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-SL-2.5",
+      "title": "Composite and inverse",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-SL-2.7",
+      "title": "Quadratic solving",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    },
+    {
+      "syllabusId": "AA-SL-2.8",
+      "title": "Rational functions",
+      "distinctTemplates": 2,
+      "target": 15,
+      "gap": 13,
+      "reasons": [
+        "fewer than 3 distinct mathematical templates",
+        "no mixed-topic questions"
+      ]
+    }
+  ]
+}

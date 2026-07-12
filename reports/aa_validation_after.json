@@ -1,0 +1,169 @@
+{
+  "generatedAt": "2026-07-12T09:47:59.846Z",
+  "status": "PASS",
+  "totals": {
+    "examQuestions": 843,
+    "mcqQuestions": 498,
+    "allQuestions": 1341,
+    "syllabusPoints": 83,
+    "generatorFamilies": 19,
+    "generatorSamples": 9500,
+    "errors": 0,
+    "warnings": 0
+  },
+  "correctOptionPositionCounts": [
+    123,
+    126,
+    126,
+    123
+  ],
+  "supportedDiagramTypes": [
+    "functionTransform",
+    "triangle",
+    "normalCurve",
+    "areaCurve",
+    "scatterPlot",
+    "trigGraph",
+    "vectorGrid",
+    "boxPlot",
+    "dataTable",
+    "argandAxes",
+    "openBoxNet"
+  ],
+  "generatorResults": [
+    {
+      "name": "arithmeticSequences",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "geometricSequences",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "logarithmEquations",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "binomialExpansion",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "inverseFunctions",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "transformationsOfFunctions",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "solvingTrigonometricEquations",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "exactTrigonometricValues",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "vectorScalarProduct",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "normalDistribution",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "conditionalProbability",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "differentiation",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "integration",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "areaUnderCurve",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "hlComplexNumbers",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "hlProofByInduction",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "hlMaclaurinSeries",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "hlAdvancedCalculus",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    },
+    {
+      "name": "hl3DVectors",
+      "samples": 500,
+      "failures": 0,
+      "messages": []
+    }
+  ],
+  "errors": [],
+  "warnings": [],
+  "automatedChecks": [
+    "duplicate IDs",
+    "required metadata",
+    "syllabus mappings",
+    "level and paper classifications",
+    "Paper 1 calculator policy",
+    "difficulty range",
+    "mixed-topic tag consistency",
+    "mark totals and detailed markscheme sections",
+    "worked answers",
+    "math delimiter balance",
+    "supported and supplied diagrams",
+    "MCQ option uniqueness and correct-option presence",
+    "correct-option position balance",
+    "randomized generator invariants",
+    "local links and assets",
+    "question-editor element references"
+  ]
+}
