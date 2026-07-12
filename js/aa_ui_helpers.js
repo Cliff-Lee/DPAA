@@ -255,6 +255,61 @@
         </figure>
       `;
     }
+    if (diagram.type === "dataTable") {
+      const headers = (diagram.headers || []).map((item) => `<th scope="col">${escapeHtml(item)}</th>`).join("");
+      const rows = (diagram.rows || []).map((row) => `
+        <tr>${row.map((item, index) => index === 0
+          ? `<th scope="row">${escapeHtml(item)}</th>`
+          : `<td>${escapeHtml(item)}</td>`).join("")}</tr>
+      `).join("");
+      return `
+        <figure class="diagram diagram-table-wrap" aria-label="${escapeHtml(diagram.caption || "Data table")}">
+          ${diagram.caption ? `<figcaption>${escapeHtml(diagram.caption)}</figcaption>` : ""}
+          <div class="diagram-table-scroll">
+            <table class="diagram-table">
+              <thead><tr>${headers}</tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </figure>
+      `;
+    }
+    if (diagram.type === "argandAxes") {
+      return `
+        <figure class="diagram" aria-label="Blank Argand diagram">
+          <svg viewBox="0 0 300 240" role="img">
+            <path d="M30 40 H270 M30 80 H270 M30 120 H270 M30 160 H270 M30 200 H270 M70 20 V220 M110 20 V220 M150 20 V220 M190 20 V220 M230 20 V220" class="grid-line"/>
+            <line x1="25" y1="120" x2="278" y2="120" class="axis"/>
+            <line x1="150" y1="225" x2="150" y2="12" class="axis"/>
+            <text x="260" y="110">Re</text>
+            <text x="160" y="25">Im</text>
+            <text x="156" y="138">0</text>
+          </svg>
+        </figure>
+      `;
+    }
+    if (diagram.type === "openBoxNet") {
+      const width = escapeHtml(diagram.width || "");
+      const height = escapeHtml(diagram.height || "");
+      const cut = escapeHtml(diagram.cut || "x");
+      return `
+        <figure class="diagram" aria-label="Rectangular sheet with equal corner squares removed">
+          <svg viewBox="0 0 340 230" role="img">
+            <rect x="45" y="30" width="250" height="165" class="shape-fill shape-line"/>
+            <path d="M45 65 H80 V30 M260 30 V65 H295 M45 160 H80 V195 M260 195 V160 H295" class="cut-line"/>
+            <path d="M45 65 H80 V30 M260 30 V65 H295 M45 160 H80 V195 M260 195 V160 H295" class="dash"/>
+            <line x1="45" y1="212" x2="295" y2="212" class="dimension-line"/>
+            <line x1="315" y1="30" x2="315" y2="195" class="dimension-line"/>
+            <text x="164" y="226">${width} cm</text>
+            <text x="320" y="118" transform="rotate(90 320 118)">${height} cm</text>
+            <text x="58" y="52">${cut}</text>
+            <text x="270" y="52">${cut}</text>
+            <text x="58" y="184">${cut}</text>
+            <text x="270" y="184">${cut}</text>
+          </svg>
+        </figure>
+      `;
+    }
     return "";
   }
 
@@ -280,7 +335,18 @@
     "workedSolutionLatex",
     "explanation",
     "hint",
-    "estimatedTimeSeconds"
+    "estimatedTimeSeconds",
+    "primarySyllabusId",
+    "secondarySyllabusIds",
+    "syllabusIds",
+    "mixedTopic",
+    "questionStyle",
+    "primaryTopic",
+    "secondaryTopics",
+    "diagramOrDataRequirement",
+    "templateFamilyId",
+    "version",
+    "validationStatus"
   ];
 
   function validateQuestion(question) {
