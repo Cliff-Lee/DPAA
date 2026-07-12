@@ -19,7 +19,8 @@ const examWindow = loadWindow([
   "data/aa_syllabus.js",
   "data/aa_exam_question_bank_reconciled.js",
   "data/aa_exam_question_bank_verified.js",
-  "data/aa_exam_question_bank_curated_expansion.js"
+  "data/aa_exam_question_bank_curated_expansion.js",
+  "data/aa_exam_question_bank_second_expansion.js"
 ]);
 const mcqWindow = loadWindow([
   "data/aa_syllabus.js",
@@ -298,7 +299,8 @@ const report = {
       "data/aa_syllabus.js",
       "data/aa_exam_question_bank_reconciled.js",
       "data/aa_exam_question_bank_verified.js",
-      "data/aa_exam_question_bank_curated_expansion.js"
+      "data/aa_exam_question_bank_curated_expansion.js",
+      "data/aa_exam_question_bank_second_expansion.js"
     ],
     finalMcqLoadOrder: [
       "data/aa_syllabus.js",

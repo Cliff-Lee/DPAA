@@ -18,7 +18,9 @@ const markschemeLabels = [
 ];
 const supportedDiagrams = new Set([
   "functionTransform", "triangle", "normalCurve", "areaCurve", "scatterPlot",
-  "trigGraph", "vectorGrid", "boxPlot", "dataTable", "argandAxes", "openBoxNet"
+  "trigGraph", "vectorGrid", "boxPlot", "dataTable", "argandAxes", "openBoxNet",
+  "argandLocus", "rationalGraph", "modulusPiecewise", "advancedTrig", "calculusTangent",
+  "numberLine", "vectorScene", "densityGraph", "cdfGraph"
 ]);
 
 function load(files) {
@@ -31,7 +33,8 @@ const examWindow = load([
   "data/aa_syllabus.js",
   "data/aa_exam_question_bank_reconciled.js",
   "data/aa_exam_question_bank_verified.js",
-  "data/aa_exam_question_bank_curated_expansion.js"
+  "data/aa_exam_question_bank_curated_expansion.js",
+  "data/aa_exam_question_bank_second_expansion.js"
 ]);
 const mcqWindow = load([
   "data/aa_syllabus.js",
