@@ -90,6 +90,62 @@ const duplicatePrimaryParts = duplicateGroups((question) => normalize(question.p
 const duplicatePartSets = duplicateGroups((question) => normalize((question.parts || []).map((part) => part.promptLatex).join(" | ")));
 const nearDuplicates = nearDuplicatePairs();
 
+const allParts = questions.flatMap((question) =>
+  (question.parts || []).map((part) => ({ question, part }))
+);
+const weakStateOnePrompts = allParts
+  .filter(({ part }) => /\bstate one\b/i.test(part.promptLatex || ""))
+  .map(({ question, part }) => `${question.id}(${part.label})`);
+const genericAwardMarkschemes = allParts
+  .filter(({ part }) => /\baward (?:a |an |the |\d+ )?marks? for\b/i.test(part.markschemeLatex || ""))
+  .map(({ question, part }) => `${question.id}(${part.label})`);
+const genericExpectedWorking = allParts
+  .filter(({ part }) => /\bA valid (?:check|response|comparison|generalization)|\bmust (?:use|arise from|be relevant to)|\bstrong response\b/i.test(part.workedSolutionLatex || ""))
+  .map(({ question, part }) => `${question.id}(${part.label})`);
+const requiredMarkschemeLabels = [
+  "Question/part:",
+  "Expected working:",
+  "FT guidance:",
+  "Alternative methods/forms accepted:",
+  "Common errors and how to mark them:",
+  "Final acceptable answers:",
+  "Total:"
+];
+const incompleteDetailedMarkschemes = allParts
+  .filter(({ part }) => requiredMarkschemeLabels.some((label) => !(part.markschemeLatex || "").includes(label)))
+  .map(({ question, part }) => `${question.id}(${part.label})`);
+const annotationMismatches = allParts
+  .filter(({ part }) => {
+    const annotations = part.markingGuidance?.markAnnotations || [];
+    return annotations.length !== part.marks
+      || annotations.some((annotation) => !/^[MAR]1$/.test(annotation.code));
+  })
+  .map(({ question, part }) => ({
+    id: `${question.id}(${part.label})`,
+    statedMarks: part.marks,
+    annotationCount: part.markingGuidance?.markAnnotations?.length || 0
+  }));
+const questionTotalMismatches = questions
+  .map((question) => ({
+    id: question.id,
+    stated: question.totalMarks,
+    calculated: (question.parts || []).reduce((sum, part) => sum + part.marks, 0)
+  }))
+  .filter((row) => row.stated !== row.calculated);
+const showThatWithoutAG = allParts
+  .filter(({ part }) => /\bshow that\b|^Verify\b/i.test(part.promptLatex || "") && !part.markingGuidance?.answerGiven)
+  .map(({ question, part }) => `${question.id}(${part.label})`);
+const henceWithoutRestriction = allParts
+  .filter(({ part }) => /\bhence\b/i.test(part.promptLatex || "") && !/Hence is restrictive/.test(part.markingGuidance?.followThrough || ""))
+  .map(({ question, part }) => `${question.id}(${part.label})`);
+const bankMarkTotal = questions.reduce((sum, question) => sum + question.totalMarks, 0);
+const markAnnotationTotals = allParts.reduce((totals, { part }) => {
+  (part.markingGuidance?.markAnnotations || []).forEach(({ code }) => {
+    totals[code] = (totals[code] || 0) + 1;
+  });
+  return totals;
+}, {});
+
 const report = {
   questions: questions.length,
   syllabusPoints: syllabusPoints.length,
@@ -99,7 +155,17 @@ const report = {
   duplicateQuestions,
   duplicatePrimaryParts,
   duplicatePartSets,
-  nearDuplicates
+  nearDuplicates,
+  bankMarkTotal,
+  markAnnotationTotals,
+  weakStateOnePrompts,
+  genericAwardMarkschemes,
+  genericExpectedWorking,
+  incompleteDetailedMarkschemes,
+  annotationMismatches,
+  questionTotalMismatches,
+  showThatWithoutAG,
+  henceWithoutRestriction
 };
 
 console.log(JSON.stringify(report, null, 2));
@@ -110,6 +176,14 @@ const failed = questions.length !== syllabusPoints.length * 10
   || duplicateQuestions.length > 0
   || duplicatePrimaryParts.length > 0
   || duplicatePartSets.length > 0
-  || nearDuplicates.length > 0;
+  || nearDuplicates.length > 0
+  || weakStateOnePrompts.length > 0
+  || genericAwardMarkschemes.length > 0
+  || genericExpectedWorking.length > 0
+  || incompleteDetailedMarkschemes.length > 0
+  || annotationMismatches.length > 0
+  || questionTotalMismatches.length > 0
+  || showThatWithoutAG.length > 0
+  || henceWithoutRestriction.length > 0;
 
 if (failed) process.exitCode = 1;
