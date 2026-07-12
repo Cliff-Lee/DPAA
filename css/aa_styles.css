@@ -1284,6 +1284,46 @@ th {
   stroke-dasharray: 5 4;
 }
 
+.parameter-diagram svg {
+  min-height: 180px;
+}
+
+.diagram-guide {
+  fill: none;
+  stroke: #98a2b3;
+  stroke-width: 2;
+  stroke-dasharray: 7 6;
+  opacity: 0.45;
+}
+
+.review-family-card {
+  margin: 18px 0;
+  break-inside: avoid;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.review-family-card .exam-parts,
+.review-family-card .exam-parts > li,
+.review-family-card .diagram-table-scroll,
+.review-family-card .math-block {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.review-family-card .diagram-table-scroll {
+  width: 100%;
+}
+
+.review-family-card code {
+  overflow-wrap: anywhere;
+}
+
+.review-mark-table {
+  min-width: 900px;
+  font-size: 0.8rem;
+}
+
 .axis,
 .shape-line,
 .grid-line {
