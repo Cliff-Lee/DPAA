@@ -17,6 +17,20 @@
   --purple: #6b46c1;
   --purple-soft: #eee9ff;
   --shadow: 0 12px 30px rgba(16, 24, 40, 0.08);
+  --color-primary: #1f4f78;
+  --color-primary-hover: #173f62;
+  --color-surface: #ffffff;
+  --color-background: #f3f6f9;
+  --color-border: #d7e0e8;
+  --color-text: #172536;
+  --color-text-muted: #607083;
+  --color-success: #236b52;
+  --color-warning: #8a5a08;
+  --color-danger: #9b3834;
+  --shadow-sm: 0 2px 8px rgba(25, 42, 62, 0.06);
+  --shadow-md: 0 12px 28px rgba(25, 42, 62, 0.09);
+  --radius-sm: 7px;
+  --radius-md: 12px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -52,6 +66,18 @@ button:disabled {
 
 .hidden {
   display: none !important;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 .app-shell {
@@ -407,6 +433,26 @@ a:focus-visible {
 .primary-button {
   background: var(--blue);
   color: #fff;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #0f568d;
+  transform: translateY(-1px);
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: #aebdca;
+  background: #e7edf3;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: #f8d9d6;
+}
+
+.primary-button:active:not(:disabled),
+.secondary-button:active:not(:disabled),
+.danger-button:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .secondary-button {
@@ -1052,40 +1098,414 @@ th {
   text-align: center;
 }
 
-.heatmap-wrap {
-  overflow-x: auto;
+.teacher-dashboard {
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(57, 113, 156, 0.08), transparent 28rem),
+    var(--color-background);
+  color: var(--color-text);
 }
 
-.heatmap-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--columns), minmax(92px, 1fr));
-  min-width: 780px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
+.teacher-dashboard .app-shell {
+  width: min(1380px, calc(100% - 40px));
 }
 
-.heatmap-heading,
-.heatmap-student,
-.heatmap-cell {
-  min-height: 44px;
-  display: grid;
-  place-items: center;
-  padding: 8px;
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+.teacher-dashboard .page-header {
+  margin-bottom: 14px;
+}
+
+.teacher-dashboard .page-header h1 {
+  margin-bottom: 0;
+  color: #132f49;
+  letter-spacing: -0.025em;
+}
+
+.teacher-dashboard .card {
+  min-width: 0;
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.teacher-dashboard .dashboard-content {
+  min-width: 0;
+}
+
+.teacher-dashboard .dashboard-content > h2,
+.teacher-dashboard .section-heading h2 {
+  color: #1c3853;
+  letter-spacing: -0.01em;
+}
+
+.teacher-dashboard .filter-card {
+  background: linear-gradient(180deg, #ffffff, #fbfcfd);
+}
+
+.teacher-dashboard label span {
+  color: #354a60;
   font-size: 0.82rem;
+  letter-spacing: 0.01em;
+}
+
+.teacher-dashboard input,
+.teacher-dashboard select {
+  border-color: var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.teacher-dashboard input:hover,
+.teacher-dashboard select:hover {
+  border-color: #aebdca;
+}
+
+.teacher-dashboard .primary-button {
+  background: var(--color-primary);
+}
+
+.teacher-dashboard .primary-button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.teacher-dashboard .secondary-button {
+  color: #24394d;
+  background: #f5f7fa;
+  border-color: #ccd7e1;
+}
+
+.teacher-dashboard .danger-button {
+  color: var(--color-danger);
+}
+
+.teacher-dashboard .primary-button,
+.teacher-dashboard .secondary-button,
+.teacher-dashboard .danger-button {
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.teacher-dashboard .metric-card {
+  min-height: 86px;
+  border-color: #dce4eb;
+  border-radius: var(--radius-sm);
+  background: #f7f9fb;
+}
+
+.teacher-dashboard .metric-value {
+  color: #173f62;
+  font-variant-numeric: tabular-nums;
+}
+
+.teacher-dashboard .dashboard-grid {
+  gap: 14px;
+  margin: 14px 0;
+}
+
+.teacher-dashboard .stat-list li,
+.teacher-dashboard .class-list-item,
+.teacher-dashboard .readiness-card {
+  border-color: #dde5ec;
+  box-shadow: 0 1px 2px rgba(25, 42, 62, 0.03);
+}
+
+.teacher-dashboard .table-wrap {
+  max-width: 100%;
+  border: 1px solid #dde5ec;
+  border-radius: var(--radius-sm);
+  -webkit-overflow-scrolling: touch;
+}
+
+.teacher-dashboard .table-wrap table {
+  background: #fff;
+}
+
+.teacher-dashboard .table-wrap th {
+  background: #f5f7fa;
+  color: #4c6074;
+}
+
+.teacher-dashboard .table-wrap tbody tr:hover {
+  background: #f7fafc;
+}
+
+.teacher-dashboard .status-line {
+  color: var(--color-text-muted);
+}
+
+.teacher-dashboard .auth-error,
+.teacher-dashboard .status-line.is-error {
+  color: var(--color-danger);
+}
+
+.dashboard-empty-state {
+  display: grid;
+  justify-items: start;
+  gap: 5px;
+  padding: 18px;
+  border: 1px dashed #cbd6e0;
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+  color: var(--color-text-muted);
+}
+
+.dashboard-empty-state strong {
+  color: #34495e;
+}
+
+.heatmap-card {
+  min-width: 0;
+  overflow: visible;
+}
+
+.heatmap-section-heading {
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.heatmap-section-heading h2 {
+  margin-bottom: 5px;
+}
+
+.heatmap-description {
+  max-width: 720px;
+  margin-bottom: 0;
+}
+
+.heatmap-export-actions {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.download-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.download-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.heatmap-export-status {
+  max-width: 320px;
+  min-height: 1.2em;
+  margin: 0;
+  text-align: right;
+  font-size: 0.78rem;
+}
+
+.heatmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  color: #4c6074;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.heatmap-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.heatmap-legend-swatch {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(28, 56, 83, 0.18);
+  border-radius: 3px;
+}
+
+.heatmap-region,
+.heatmap-scroll-shell,
+.heatmap-scroll-container {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.heatmap-scroll-shell {
+  position: relative;
+  width: 100%;
+  contain: layout inline-size;
+}
+
+.heatmap-scroll-shell.is-overflowing:not(.is-at-end)::after {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  top: 30px;
+  right: 0;
+  bottom: 18px;
+  width: 28px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(31, 79, 120, 0.15));
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.heatmap-scroll-cue {
+  margin: 0 0 6px;
+  color: #526a80;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.heatmap-scroll-container {
+  width: 100%;
+  contain: layout inline-size paint;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 8px;
+  border: 1px solid #d6e0e8;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  scrollbar-width: auto;
+  scrollbar-color: #8196a9 #e8edf2;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+  touch-action: pan-x pan-y;
+  scroll-padding-left: 188px;
+}
+
+.heatmap-scroll-container:focus-visible {
+  outline: 3px solid rgba(31, 79, 120, 0.32);
+  outline-offset: 3px;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar {
+  height: 14px;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar-track {
+  background: #e8edf2;
+  border-radius: 999px;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar-thumb {
+  min-width: 44px;
+  border: 3px solid #e8edf2;
+  border-radius: 999px;
+  background: #8196a9;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #61788c;
+}
+
+.heatmap-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  background: #fff;
+  font-size: 0.8rem;
+}
+
+.heatmap-table th,
+.heatmap-table td {
+  height: 46px;
+  padding: 8px 10px;
+  border-right: 1px solid #dde5ec;
+  border-bottom: 1px solid #dde5ec;
   text-align: center;
+  vertical-align: middle;
 }
 
-.heatmap-heading,
-.heatmap-student {
-  background: var(--surface-strong);
+.heatmap-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #eaf0f5;
+  color: #344b61;
+  font-size: 0.75rem;
   font-weight: 800;
+  letter-spacing: 0.015em;
+  text-transform: none;
 }
 
-.heatmap-cell {
-  font-weight: 900;
+.heatmap-column-heading,
+.heatmap-value-cell {
+  width: 106px;
+  min-width: 106px;
+  max-width: 106px;
+}
+
+.heatmap-student-heading,
+.heatmap-student-name {
+  position: sticky;
+  left: 0;
+  width: 188px;
+  min-width: 188px;
+  max-width: 188px;
+  text-align: left !important;
+}
+
+.heatmap-student-heading {
+  z-index: 4 !important;
+  background: #dfe8f0 !important;
+}
+
+.heatmap-student-name {
+  z-index: 3;
+  overflow: hidden;
+  background: #f7f9fb;
+  color: #21394f;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heatmap-value-cell {
+  color: #243648;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.heatmap-no-data {
+  background: #eef2f5;
+  color: #617080;
+}
+
+.heatmap-low {
+  background: #f7e5e3;
+  color: #7d302d;
+}
+
+.heatmap-developing {
+  background: #faefd2;
+  color: #72500b;
+}
+
+.heatmap-secure {
+  background: #e4efea;
+  color: #285b4a;
+}
+
+.heatmap-strong {
+  background: #d8eadf;
+  color: #174f3c;
+}
+
+.heatmap-table tbody tr:hover .heatmap-student-name,
+.heatmap-table tbody tr:hover .heatmap-value-cell {
+  box-shadow: inset 0 2px rgba(31, 79, 120, 0.16), inset 0 -2px rgba(31, 79, 120, 0.16);
+}
+
+.heatmap-table tr:last-child th,
+.heatmap-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.heatmap-table th:last-child,
+.heatmap-table td:last-child {
+  border-right: 0;
 }
 
 .editor-layout {
@@ -1417,6 +1837,28 @@ svg text {
   .topic-syllabus-actions {
     align-items: stretch;
   }
+
+  .teacher-dashboard .app-shell {
+    width: min(100% - 28px, 1380px);
+  }
+
+  .teacher-dashboard .filter-action {
+    align-items: stretch;
+  }
+
+  .teacher-dashboard .filter-action .primary-button {
+    width: 100%;
+  }
+
+  .heatmap-export-actions {
+    width: 100%;
+    justify-items: start;
+  }
+
+  .heatmap-export-status {
+    max-width: none;
+    text-align: left;
+  }
 }
 
 @media print {
@@ -1482,5 +1924,54 @@ svg text {
 
   .question-topline {
     flex-direction: column;
+  }
+
+  .teacher-dashboard .app-shell {
+    width: min(100% - 20px, 1380px);
+  }
+
+  .teacher-dashboard .card {
+    padding: 15px;
+  }
+
+  .teacher-dashboard .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .heatmap-legend {
+    gap: 7px 12px;
+  }
+
+  .heatmap-student-heading,
+  .heatmap-student-name {
+    width: 148px;
+    min-width: 148px;
+    max-width: 148px;
+  }
+
+  .heatmap-column-heading,
+  .heatmap-value-cell {
+    width: 98px;
+    min-width: 98px;
+    max-width: 98px;
+  }
+
+  .heatmap-scroll-container {
+    scroll-padding-left: 148px;
+  }
+
+  .download-button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
