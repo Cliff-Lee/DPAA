@@ -364,6 +364,253 @@
     return { label, promptLatex, marks, markschemeLatex, workedSolutionLatex };
   }
 
+  function improvePartPrompt(promptLatex) {
+    let prompt = String(promptLatex || "").trim();
+    const leadReplacements = [
+      [/^Complete the first stage of the analysis:\s*/i, "For the initial case, "],
+      [/^Now complete a related second stage:\s*/i, "For the related case, "],
+      [/^Solve this component before assessing a proposed method:\s*/i, "Before assessing the proposed method, "],
+      [/^Use the corrected approach on this related component:\s*/i, "Using the corrected method, "],
+      [/^Obtain an exact or analytic result for:\s*/i, "Find an analytic result for the following: "],
+      [/^Apply the validated method to the following second case:\s*/i, "Using the validated method, "],
+      [/^Establish the first result:\s*/i, "For the first comparison, "],
+      [/^Establish the comparison result:\s*/i, "For the second comparison, "],
+      [/^Build the baseline result from:\s*/i, "For the baseline calculation, "],
+      [/^Use this second result to inform the sensitivity analysis:\s*/i, "For the comparison calculation, "],
+      [/^Establish an initial case:\s*/i, "For the initial model, "],
+      [/^Establish the initial case:\s*/i, "For the initial model, "],
+      [/^Establish a comparison case:\s*/i, "For the comparison model, "],
+      [/^Establish an alternative case:\s*/i, "For the alternative model, "],
+      [/^Test the general method on a contrasting case:\s*/i, "Apply the generalized method to: "]
+    ];
+    leadReplacements.forEach(([pattern, replacement]) => {
+      prompt = prompt.replace(pattern, replacement);
+    });
+    const exactReplacements = new Map([
+      [
+        "State one mathematical check that confirms your result is reasonable.",
+        "Verify the result from part (a) using substitution, an independent calculation or an order-of-magnitude estimate. Show the check explicitly."
+      ],
+      [
+        "State one reason why a 5% change in an input need not produce a 5% change in the output.",
+        "Explain, with reference to the relationship used in part (a), why a 5% change in an input need not produce a 5% change in the output."
+      ],
+      [
+        "State one assumption or restriction on which the combined conclusion depends.",
+        "Identify an assumption or restriction on which the combined conclusion depends, and explain how it affects the validity of that conclusion."
+      ],
+      [
+        "State one limitation of relying only on technology for this problem.",
+        "Explain one limitation of relying only on technology for this problem, referring to a domain, accuracy or interpretation issue that the analytic working resolves."
+      ],
+      [
+        "State one limitation of the model or proof strategy and identify the evidence needed to address it.",
+        "Explain one limitation of the model or proof strategy, and identify the specific evidence or calculation needed to address it."
+      ],
+      [
+        "Use technology to perturb one numerical input by \(10\%\) and describe the resulting change in output.",
+        "Choose one numerical parameter used in part (a) or part (c), increase it by \(10\%\), and use technology to recalculate the corresponding output. Compare the relative change in the output with \(10\%\)."
+      ]
+    ]);
+    if (exactReplacements.has(prompt)) return exactReplacements.get(prompt);
+
+    if (/\bstate one\b/i.test(prompt)) {
+      const revised = prompt.replace(/\bstate one\b/gi, "identify one");
+      if (/\b(explain|justify|support)\b/i.test(revised)) return revised;
+      return `${revised.replace(/\.$/, "")} and justify it using the information or mathematics in the question.`;
+    }
+    return prompt;
+  }
+
+  function improveQuestionLead(question) {
+    const prompt = String(question.promptLatex || "");
+    if (/^This (direct|method-selection|verification|precision|sensitivity) short-response question assesses/i.test(prompt)) {
+      return "";
+    }
+    if (/^This .+ extended-response question develops/i.test(prompt)) {
+      return `The following parts concern ${question.syllabusLabel.toLowerCase()}. Use results from earlier parts where indicated.`;
+    }
+    if (/^This HL Paper 3/i.test(prompt)) {
+      return `This investigation concerns ${question.syllabusLabel.toLowerCase()} under changed assumptions. Use technology where directed and justify conclusions from the preceding results.`;
+    }
+    return prompt;
+  }
+
+  function stripGenericAwardLanguage(markschemeLatex) {
+    return String(markschemeLatex || "")
+      .replace(/\bAward (?:a |an |the |\d+ )?(?:method |accuracy |reasoning )?marks? for\s*/gi, "")
+      .replace(/^Award\s*/i, "")
+      .replace(/\.$/, "")
+      .trim() || "the method and result shown in the expected working";
+  }
+
+  function isReasoningPart(promptLatex) {
+    return /\b(explain|justify|prove|show that|verify|comment|interpret|compare|decide|limitation|assumption|conjecture|reason)\b/i.test(promptLatex);
+  }
+
+  function isGivenAnswerPart(promptLatex) {
+    return /\bshow that\b|^Verify\b|\bgiven that the (?:answer|result)\b/i.test(promptLatex);
+  }
+
+  function markCodesFor(part) {
+    const marks = Number(part.marks) || 0;
+    const reasoning = isReasoningPart(part.promptLatex);
+    const answerGiven = isGivenAnswerPart(part.promptLatex);
+    if (marks === 1) return [reasoning || answerGiven ? "R1" : "A1"];
+    if (marks === 2 && answerGiven) return ["M1", "R1"];
+    if (marks === 3) {
+      if (answerGiven) return ["M1", "A1", "R1"];
+      if (reasoning) return ["M1", "R1", "A1"];
+      return ["M1", "A1", "A1"];
+    }
+
+    const calculationPattern = ["M1", "A1", "M1", "A1", "R1", "M1"];
+    const reasoningPattern = ["M1", "R1", "A1", "R1", "M1", "R1"];
+    const givenAnswerPattern = ["M1", "A1", "M1", "R1", "M1", "R1"];
+    const pattern = answerGiven ? givenAnswerPattern : (reasoning ? reasoningPattern : calculationPattern);
+    return Array.from({ length: marks }, (_, index) => pattern[index % pattern.length]);
+  }
+
+  function criterionItems(criterion) {
+    const items = String(criterion || "")
+      .split(/(?:;|,|\band\b)\s+/i)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return items.length ? items : [criterion];
+  }
+
+  function expectedWorkingSteps(workedSolutionLatex) {
+    const steps = String(workedSolutionLatex || "")
+      .split(/\.\s+|,\s+(?=(?:so|hence|therefore|then)\b)|\s+(?=(?:Then|Hence|Therefore|Also|Since)\b)/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return steps.length ? steps : [workedSolutionLatex];
+  }
+
+  function buildMarkAnnotations(part, originalMarkscheme) {
+    const criterion = stripGenericAwardLanguage(originalMarkscheme);
+    const criteria = criterionItems(criterion);
+    const workingSteps = expectedWorkingSteps(part.workedSolutionLatex);
+    const codes = markCodesFor(part);
+    let methodIndex = 0;
+    let accuracyIndex = 0;
+    let reasoningIndex = 0;
+
+    return codes.map((code) => {
+      if (code === "M1") {
+        methodIndex += 1;
+        const focus = criteria[Math.min(methodIndex - 1, criteria.length - 1)];
+        const visibleStep = workingSteps[Math.min(methodIndex - 1, workingSteps.length - 1)];
+        return {
+          code,
+          description: methodIndex === 1
+            ? `Uses a valid process for ${focus}, leading to the visible step ${visibleStep} The equation, substitution, construction or procedure must be shown; a bare final answer does not earn this mark.`
+            : `Carries the process through for ${focus}, reaching the next relevant step ${visibleStep} This method mark remains available after an earlier arithmetic error.`
+        };
+      }
+      if (code === "A1") {
+        accuracyIndex += 1;
+        const accuracyCount = codes.filter((item) => item === "A1").length;
+        const focusIndex = accuracyIndex === accuracyCount
+          ? criteria.length - 1
+          : Math.min(accuracyIndex - 1, criteria.length - 1);
+        const focus = criteria[focusIndex];
+        const accurateStep = workingSteps[Math.min(accuracyIndex - 1, workingSteps.length - 1)];
+        return {
+          code,
+          description: accuracyIndex === accuracyCount
+            ? `Obtains the correct result for ${focus}: ${accurateStep} This accuracy mark depends on the relevant M1.`
+            : `Obtains the correct intermediate result for ${focus}: ${accurateStep} This accuracy mark depends on the preceding M1.`
+        };
+      }
+      reasoningIndex += 1;
+      const focus = criteria[Math.min(reasoningIndex - 1, criteria.length - 1)];
+      return {
+        code,
+        description: reasoningIndex === 1
+          ? `Gives a mathematically valid justification for ${focus}, rather than an unsupported statement.`
+          : `Connects the result to ${focus} and the stated restriction, context, comparison or conclusion with valid mathematical reasoning.`
+      };
+    });
+  }
+
+  function finalAnswerGuidance(part) {
+    return `${part.workedSolutionLatex} Accept mathematically equivalent exact forms. Unless the question specifies otherwise, also accept a numerical value correct to three significant figures. Do not accept calculator-specific syntax, incomplete arithmetic or an unsimplified integer result as the final answer.`;
+  }
+
+  function alternativeGuidance(part, criterion) {
+    const methodRequired = /\b(use|using|hence|by induction|first principles)\b/i.test(part.promptLatex);
+    if (methodRequired) {
+      return `METHOD 1: the method required by the command term, as shown in Expected working. Other representations of the same method are accepted. An unrelated alternative method does not earn method marks where the question explicitly requires this approach.`;
+    }
+    return `METHOD 1: the route shown in Expected working, using ${criterion}. METHOD 2: any complete, mathematically valid alternative that reaches an equivalent result and displays enough working to identify the corresponding M and A marks.`;
+  }
+
+  function followThroughGuidance(question, part, partIndex) {
+    if (/\bHence\b/.test(part.promptLatex)) {
+      return "Hence is restrictive: the preceding result or intended approach must be used. FT is available from a consistent earlier result, but not when a failed show-that result is ignored, the carried value contradicts given information, produces an impossible result, or makes this part unreasonably easy.";
+    }
+    if (partIndex > 0) {
+      return "FT is available when the student correctly uses an earlier incorrect result in a method of comparable difficulty. Do not award FT if the value contradicts given information, is impossible, follows from a failed show-that that the student ignores, or makes the later work unreasonably easy. Within this part, allow later method marks after an error but withhold dependent accuracy marks.";
+    }
+    return "No earlier-part FT applies. Within this part, allow an appropriate later method mark after an arithmetic or algebraic error, but do not award a later accuracy mark that depends on the incorrect value.";
+  }
+
+  function commonErrorGuidance(question, part) {
+    const misconception = (question.misconceptionTags || [])[0]
+      || "uses a formula or process that does not match the supplied information";
+    return `Common error: ${misconception}. Award only the marks supported by the student's visible working. A value copied incorrectly from the question is penalized once and marked MR; continue to award all other available marks consistently. Do not use MR for a student's miscopy of their own working. Penalize premature rounding only when it changes a required answer; carry the unrounded value into later work.`;
+  }
+
+  function formatDetailedMarkscheme(guidance) {
+    const annotationLines = guidance.markAnnotations
+      .map((annotation) => `<strong>${annotation.code}:</strong> ${annotation.description}`)
+      .join("<br>");
+    const agLine = guidance.answerGiven
+      ? "<br><strong>AG:</strong> The stated result is given in the question. Reproducing it without the required derivation earns no accuracy mark."
+      : "";
+    return [
+      `<strong>Question/part:</strong> ${guidance.questionPart}`,
+      `<strong>Expected working:</strong> ${guidance.expectedWorking}`,
+      annotationLines + agLine,
+      `<strong>FT guidance:</strong> ${guidance.followThrough}`,
+      `<strong>Alternative methods/forms accepted:</strong> ${guidance.alternatives}`,
+      `<strong>Common errors and how to mark them:</strong> ${guidance.commonErrors}`,
+      `<strong>Final acceptable answers:</strong> ${guidance.finalAnswers}`,
+      `<strong>Total:</strong> [${guidance.total} mark${guidance.total === 1 ? "" : "s"}]`
+    ].join("<br>");
+  }
+
+  function enhanceQuestion(question) {
+    question.promptLatex = improveQuestionLead(question);
+    question.parts = question.parts.map((part, partIndex) => {
+      const originalMarkscheme = part.markschemeLatex;
+      part.promptLatex = improvePartPrompt(part.promptLatex);
+      const criterion = stripGenericAwardLanguage(originalMarkscheme);
+      part.markingGuidance = {
+        questionPart: `${question.id}(${part.label})`,
+        expectedWorking: part.workedSolutionLatex,
+        markAnnotations: buildMarkAnnotations(part, originalMarkscheme),
+        answerGiven: isGivenAnswerPart(part.promptLatex),
+        followThrough: followThroughGuidance(question, part, partIndex),
+        alternatives: alternativeGuidance(part, criterion),
+        commonErrors: commonErrorGuidance(question, part),
+        finalAnswers: finalAnswerGuidance(part),
+        total: part.marks
+      };
+      part.markschemeLatex = formatDetailedMarkscheme(part.markingGuidance);
+      return part;
+    });
+    question.totalMarks = question.parts.reduce((sum, part) => sum + part.marks, 0);
+    question.workedSolutionLatex = question.parts
+      .map((part) => `(${part.label}) ${part.workedSolutionLatex}`)
+      .join(" ");
+    question.markschemeLatex = question.parts
+      .map((part) => `(${part.label}) ${part.markschemeLatex}`)
+      .join(" ");
+    return question;
+  }
+
   function taskFor(point, index) {
     const pointTasks = tasks[point.id];
     if (!pointTasks) {
@@ -390,7 +637,7 @@
       solution: (task) => task.workedSolutionLatex,
       markscheme: (task) => task.markschemeLatex,
       followUp: "State one mathematical check that confirms your result is reasonable.",
-      followUpSolution: (point) => `A valid check must use the definitions, restrictions or expected behaviour of ${point.shortLabel.toLowerCase()}.`,
+      followUpSolution: (task, point) => `Reverse or independently repeat the calculation shown in part (a): ${task.workedSolutionLatex} The check must reproduce the supplied information and satisfy the definitions or restrictions of ${point.shortLabel.toLowerCase()}.`,
       followUpMarkscheme: "Award 1 mark for a specific check applied to the obtained result."
     },
     {
@@ -400,7 +647,7 @@
       solution: (task, point, index) => `Identify ${skillReference(point, index)} as the governing relationship. ${task.workedSolutionLatex}`,
       markscheme: (task, point, index) => `Award a method mark for selecting ${skillReference(point, index)}. ${task.markschemeLatex}`,
       followUp: "Explain why the selected relationship is applicable to the given information.",
-      followUpSolution: (point, index) => `The relationship is applicable because the stated information satisfies the conditions for ${skillReference(point, index)}.`,
+      followUpSolution: (task, point, index) => `The supplied values satisfy the conditions for ${skillReference(point, index)}. Applying that relationship gives ${task.workedSolutionLatex}, so the data and the selected method are consistent.`,
       followUpMarkscheme: "Award 1 mark for linking the method to the supplied data rather than merely naming a formula."
     },
     {
@@ -410,7 +657,7 @@
       solution: (task) => `${task.workedSolutionLatex} An independent verification should reproduce the result and respect every stated restriction.`,
       markscheme: (task) => `${task.markschemeLatex} Reserve one method mark for a valid independent verification.`,
       followUp: "Identify one plausible error that the verification would detect.",
-      followUpSolution: () => "A valid response identifies an error such as a sign, scale, domain, endpoint, unit or rounding error that is relevant to this calculation.",
+      followUpSolution: (task) => `Reversing, substituting or independently recalculating ${task.workedSolutionLatex} would detect a changed sign, scale, domain, endpoint, unit or rounded value because it would fail to reproduce the original information.`,
       followUpMarkscheme: "Award 1 mark for a plausible error explicitly connected to the verification."
     },
     {
@@ -420,7 +667,7 @@
       solution: (task) => `${task.workedSolutionLatex} Keep the exact form until the final line; any decimal form should then be rounded to three significant figures.`,
       markscheme: (task) => `${task.markschemeLatex} Accept an exact form and a consistently rounded three-significant-figure value where applicable.`,
       followUp: "Comment on whether the exact or approximate form is more useful in this question.",
-      followUpSolution: () => "An exact form preserves mathematical structure; an approximation is useful for interpretation or comparison when a numerical value is required.",
+      followUpSolution: (task) => `The exact working ${task.workedSolutionLatex} preserves the mathematical structure and avoids premature rounding. A three-significant-figure value is appropriate only when a numerical comparison or contextual interpretation is required.`,
       followUpMarkscheme: "Award 1 mark for a justified comment about exactness or numerical accuracy."
     },
     {
@@ -430,7 +677,7 @@
       solution: (task) => `${task.workedSolutionLatex} For a 5% increase, replace the chosen input by \(1.05\) times its original value and repeat the same valid method, checking whether the relationship is linear or non-linear.`,
       markscheme: (task) => `${task.markschemeLatex} Award a method mark for a correct 5% multiplier and a valid description of the recalculation.`,
       followUp: "State one reason why a 5% change in an input need not produce a 5% change in the output.",
-      followUpSolution: () => "The relationship may involve powers, logarithms, trigonometric functions, probability constraints or another non-linear operation.",
+      followUpSolution: (task) => `The calculation ${task.workedSolutionLatex} may contain a power, logarithm, trigonometric function, probability constraint or another non-linear operation. Replacing an input by \(1.05\) times its value therefore need not multiply the output by \(1.05\).`,
       followUpMarkscheme: "Award 1 mark for identifying a relevant non-linear or constrained relationship."
     }
   ];
@@ -439,9 +686,12 @@
     const profileIndex = Math.floor(index / 2);
     const profile = sectionAProfiles[profileIndex];
     const task = taskFor(point, profileIndex);
+    const secondTask = taskFor(point, profileIndex + 1);
     const paperStyle = profile.paperStyle;
     const marks = paperStyle === "Paper 1" ? 5 : 6;
-    return {
+    const firstPartMarks = 3;
+    const secondPartMarks = marks - firstPartMarks;
+    const question = {
       examSection: "Section A",
       paperStyle,
       calculator: paperStyle === "Paper 1" ? "not_allowed" : "gdc_useful",
@@ -453,19 +703,20 @@
         makePart(
           "a",
           profile.lead(task, point, profileIndex),
-          marks - 1,
+          firstPartMarks,
           profile.markscheme(task, point, profileIndex),
           profile.solution(task, point, profileIndex)
         ),
         makePart(
           "b",
-          profile.followUp,
-          1,
-          profile.followUpMarkscheme,
-          profile.followUpSolution(point, profileIndex)
+          secondTask.promptLatex,
+          secondPartMarks,
+          secondTask.markschemeLatex,
+          secondTask.workedSolutionLatex
         )
       ]
     };
+    return question;
   }
 
   const sectionBProfiles = [
@@ -480,7 +731,7 @@
       conclusion: "Use both results to state a coherent final conclusion, with appropriate accuracy.",
       conclusionSolution: "Bring the two results together, preserve units or restrictions, and round only the final numerical conclusion.",
       evaluation: "State one assumption or restriction on which the combined conclusion depends.",
-      evaluationSolution: (point) => `The assumption or restriction must be relevant to ${point.description.toLowerCase()}`
+      evaluationSolution: (point) => `Identify a concrete domain, convergence, independence, continuity, model or data restriction arising from ${point.description.toLowerCase()}, and explain how violating it would invalidate or change the combined conclusion.`
     },
     {
       name: "error analysis",
@@ -491,9 +742,9 @@
       bridgeSolution: (point, index) => `The method must match the structure and restrictions of ${skillReference(point, index)}; an unrelated formula does not use the supplied information correctly.`,
       secondLead: "Use the corrected approach on this related component:",
       conclusion: "Compare the two pieces of working and identify one consistency check between them.",
-      conclusionSolution: "A valid comparison checks sign, magnitude, units, domain, endpoints or an equivalent structural feature shared by the results.",
+      conclusionSolution: "Compare the sign, magnitude, units, domain and any endpoints in the two results. Identify the feature that should agree, perform that check explicitly, and explain whether the results are consistent.",
       evaluation: "Identify the most consequential error that could remain after the comparison.",
-      evaluationSolution: () => "A valid response identifies a relevant unresolved algebraic, arithmetic, domain or interpretation error."
+      evaluationSolution: () => "Identify the unresolved algebraic, arithmetic, domain or interpretation error that would change the conclusion most, and point to the line of working where an additional substitution or recalculation would detect it."
     },
     {
       name: "technology validation",
@@ -544,7 +795,7 @@
     const paperStyle = profile.paperStyle;
     const totalMarks = paperStyle === "Paper 1" ? 16 : 18;
     const partMarks = paperStyle === "Paper 1" ? [4, 3, 4, 3, 2] : [4, 4, 4, 3, 3];
-    return {
+    const question = {
       examSection: "Section B",
       paperStyle,
       calculator: paperStyle === "Paper 1" ? "not_allowed" : "technology_required",
@@ -560,6 +811,7 @@
         makePart("e", profile.evaluation, partMarks[4], "Award marks for a specific evaluation linked to the mathematics in the question.", profile.evaluationSolution(point, profileIndex))
       ]
     };
+    return question;
   }
 
   function paper3(point, index) {
@@ -579,11 +831,11 @@
         : `This HL Paper 3 investigation develops and tests a general model for ${point.label.toLowerCase()}.`,
       parts: isEvaluationStudy ? [
         makePart("a", `Establish a comparison case: ${first.promptLatex}`, partMarks[0], first.markschemeLatex, first.workedSolutionLatex),
-        makePart("b", `Audit the method in part (a), identifying one hidden restriction connected to ${skillReference(point, 1)}.`, partMarks[1], "Award marks for identifying, explaining and applying a genuine restriction.", `The restriction must arise from ${skillReference(point, 1)} and must be applied to the result from part (a).`),
+        makePart("b", `Audit the method in part (a), identifying one hidden restriction connected to ${skillReference(point, 1)}.`, partMarks[1], "Award marks for identifying, explaining and applying a genuine restriction.", `Identify a domain, convergence, sign, parameter or data restriction arising from ${skillReference(point, 1)}. Apply it to the result from part (a), then state whether that result remains admissible.`),
         makePart("c", `Establish an alternative case: ${second.promptLatex}`, partMarks[2], second.markschemeLatex, second.workedSolutionLatex),
         makePart("d", "Use technology to perturb one numerical input by \(10\%\) and describe the resulting change in output.", partMarks[3], "Award marks for a 1.10 input multiplier, correct technological procedure and interpreted output.", "Replace one input by 1.10 times its original value, recompute consistently and compare relative output change."),
         makePart("e", "Decide which of the two methods is more robust under the perturbation, supporting the decision with mathematical evidence.", partMarks[4], "Award marks for a justified comparison based on the preceding results.", "Robustness should be judged from sensitivity, restrictions, numerical stability and suitability of the method."),
-        makePart("f", "Evaluate one limitation of the investigation and propose one mathematically useful extension.", partMarks[5], "Award marks for a relevant limitation and a feasible extension.", `A strong response links both comments to ${point.description.toLowerCase()}`)
+        makePart("f", "Evaluate one limitation of the investigation and propose one mathematically useful extension.", partMarks[5], "Award marks for a relevant limitation and a feasible extension.", `Identify the untested domain, assumption or sensitivity arising from ${point.description.toLowerCase()}. Extend the investigation by specifying a new parameter range, comparison case or calculation, and explain what evidence it would provide.`)
       ] : [
         makePart("a", `Establish the initial case: ${first.promptLatex}`, partMarks[0], first.markschemeLatex, first.workedSolutionLatex),
         makePart("b", "Generalize the method from part (a), defining parameters and all necessary restrictions.", partMarks[1], `Award marks for a valid generalization connected to ${skillReference(point, 0)}.`, `Preserve the structure of ${point.shortLabel.toLowerCase()}, define each parameter and state its domain.`),
@@ -601,7 +853,7 @@
       : (index % 2 === 0 ? sectionA(point, index) : sectionB(point, index));
     const clean = point.id.replace("AA-", "").replace(/\./g, "-");
     const totalMarks = base.parts.reduce((sum, part) => sum + part.marks, 0);
-    return {
+    const question = {
       id: `AA-EXAM-VER-${clean}-Q${String(index + 1).padStart(2, "0")}`,
       course: "AA",
       level: point.level,
@@ -631,6 +883,7 @@
       workedSolutionLatex: base.parts.map((part) => `(${part.label}) ${part.workedSolutionLatex}`).join(" "),
       markschemeLatex: base.parts.map((part) => `(${part.label}) ${part.marks} mark${part.marks === 1 ? "" : "s"}: ${part.markschemeLatex}`).join(" ")
     };
+    return enhanceQuestion(question);
   }
 
   const points = flattenSyllabus();
