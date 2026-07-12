@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AA Teacher Dashboard</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/aa_styles.css">
+  <link rel="stylesheet" href="css/aa_styles.css?v=5">
   <script defer src="data/aa_syllabus.js"></script>
   <script type="module" src="js/storage/storage_manager.js"></script>
-  <script defer src="js/aa_progress_engine.js"></script>
+  <script defer src="js/aa_progress_engine.js?v=2"></script>
   <script defer src="js/aa_recommendations.js"></script>
   <script defer src="js/aa_ui_helpers.js"></script>
   <script defer src="js/aa_app.js"></script>
-  <script defer src="js/pages/aa_teacher_dashboard_page.js"></script>
+  <script defer src="js/pages/aa_teacher_dashboard_page.js?v=3"></script>
 </head>
-<body>
+<body class="teacher-dashboard">
   <main class="app-shell">
     <header class="page-header">
       <a class="back-link" href="aa_index.html">Home</a>
@@ -146,7 +146,7 @@
         <div id="myClassesList" class="my-classes-list"></div>
       </section>
       <div class="button-row">
-        <button id="exportCsvButton" class="secondary-button" type="button">Export CSV</button>
+        <button id="exportCsvButton" class="secondary-button" type="button">Export attempt data</button>
         <button id="resetDashboardButton" class="danger-button premium-only" type="button">Reset data</button>
       </div>
     </section>
@@ -195,9 +195,29 @@
       </div>
     </section>
 
-    <section class="card dashboard-content">
-      <h2>Student-by-syllabus heatmap</h2>
-      <div id="heatmap" class="heatmap-wrap"></div>
+    <section class="card dashboard-content heatmap-card" aria-labelledby="heatmapTitle">
+      <div class="section-heading heatmap-section-heading">
+        <div>
+          <p class="eyebrow">Syllabus coverage</p>
+          <h2 id="heatmapTitle">Student-by-syllabus heatmap</h2>
+          <p class="muted heatmap-description">Accuracy for the students and syllabus points currently shown by the dashboard filters.</p>
+        </div>
+        <div class="heatmap-export-actions">
+          <button id="downloadHeatmapCsvButton" class="secondary-button download-button" type="button" aria-label="Download the displayed student-by-syllabus heatmap as CSV" disabled>
+            <span aria-hidden="true" class="download-icon">↓</span>
+            Download CSV
+          </button>
+          <p id="heatmapExportStatus" class="status-line heatmap-export-status" aria-live="polite"></p>
+        </div>
+      </div>
+      <div class="heatmap-legend" aria-label="Heatmap accuracy legend">
+        <span><i class="heatmap-legend-swatch heatmap-no-data" aria-hidden="true"></i>No data</span>
+        <span><i class="heatmap-legend-swatch heatmap-low" aria-hidden="true"></i>Low 0–39%</span>
+        <span><i class="heatmap-legend-swatch heatmap-developing" aria-hidden="true"></i>Developing 40–69%</span>
+        <span><i class="heatmap-legend-swatch heatmap-secure" aria-hidden="true"></i>Secure 70–84%</span>
+        <span><i class="heatmap-legend-swatch heatmap-strong" aria-hidden="true"></i>Strong 85–100%</span>
+      </div>
+      <div id="heatmap" class="heatmap-region"></div>
     </section>
   </main>
 </body>
