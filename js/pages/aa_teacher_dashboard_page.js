@@ -5,6 +5,7 @@
   let eventsBound = false;
   let loadedTeacherUid = "";
   let loadingTeacherDataPromise = null;
+  let currentHeatmapModel = { points: [], rows: [] };
 
   const filters = {
     classCode: "",
@@ -36,6 +37,7 @@
       AA_UI.byId(id).addEventListener("input", readFiltersAndRender);
     });
     AA_UI.byId("exportCsvButton").addEventListener("click", exportCSV);
+    AA_UI.byId("downloadHeatmapCsvButton")?.addEventListener("click", downloadHeatmapCSV);
     AA_UI.byId("resetDashboardButton").addEventListener("click", resetData);
     AA_UI.byId("teacherLoginForm")?.addEventListener("submit", signInTeacher);
     AA_UI.byId("tryPublicDemoButton")?.addEventListener("click", signInPublicDemo);
@@ -79,6 +81,14 @@
     if (!status) return;
     status.textContent = message;
     status.classList.toggle("auth-error", Boolean(isError));
+  }
+
+  function publicDemoErrorMessage(error) {
+    const message = String(error?.message || "");
+    if (error?.code === "permission-denied" || /missing or insufficient permissions/i.test(message)) {
+      return "The public demo is being enabled on Firebase. Please try again shortly.";
+    }
+    return message || "The public demo could not be opened.";
   }
 
   function setPublicDemoUI(isPublicDemo) {
@@ -191,7 +201,7 @@
     try {
       await AAStorage.signInPublicDemo();
     } catch (error) {
-      setAuthStatus(error.message || "The public demo could not be opened.", true);
+      setAuthStatus(publicDemoErrorMessage(error), true);
     } finally {
       if (button) button.disabled = false;
     }
@@ -563,27 +573,142 @@
     });
   }
 
+  function heatmapAccuracyClass(cell) {
+    if (!cell.attempts) return "heatmap-no-data";
+    const percent = cell.accuracy * 100;
+    if (percent < 40) return "heatmap-low";
+    if (percent < 70) return "heatmap-developing";
+    if (percent < 85) return "heatmap-secure";
+    return "heatmap-strong";
+  }
+
+  function heatmapCellTitle(nickname, cell) {
+    const percentage = cell.attempts ? AA_UI.formatPercent(cell.accuracy) : "No data";
+    return `${nickname} — ${cell.syllabusId} ${cell.label}: ${cell.correct} correct of ${cell.attempts} attempted (${percentage})`;
+  }
+
+  function setHeatmapExportAvailability(hasData) {
+    const button = AA_UI.byId("downloadHeatmapCsvButton");
+    const status = AA_UI.byId("heatmapExportStatus");
+    if (button) button.disabled = !hasData;
+    if (status) status.textContent = hasData ? "" : "CSV export is available when filtered heatmap data is present.";
+  }
+
+  function updateHeatmapScrollState(scroller) {
+    const shell = scroller?.closest(".heatmap-scroll-shell");
+    if (!shell) return;
+    const canScroll = scroller.scrollWidth > scroller.clientWidth + 1;
+    const isAtEnd = scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 2;
+    shell.classList.toggle("is-overflowing", canScroll);
+    shell.classList.toggle("is-at-end", !canScroll || isAtEnd);
+    const cue = shell.querySelector(".heatmap-scroll-cue");
+    if (cue) cue.hidden = !canScroll;
+  }
+
+  function bindHeatmapScrolling(scroller) {
+    if (!scroller) return;
+    scroller.addEventListener("scroll", () => updateHeatmapScrollState(scroller), { passive: true });
+    scroller.addEventListener("wheel", (event) => {
+      if (scroller.scrollWidth <= scroller.clientWidth || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+      const before = scroller.scrollLeft;
+      scroller.scrollLeft += event.deltaY;
+      if (scroller.scrollLeft !== before) event.preventDefault();
+      updateHeatmapScrollState(scroller);
+    }, { passive: false });
+    scroller.addEventListener("keydown", (event) => {
+      const step = Math.max(96, Math.round(scroller.clientWidth * 0.65));
+      const positions = {
+        ArrowLeft: scroller.scrollLeft - 96,
+        ArrowRight: scroller.scrollLeft + 96,
+        PageUp: scroller.scrollLeft - step,
+        PageDown: scroller.scrollLeft + step,
+        Home: 0,
+        End: scroller.scrollWidth
+      };
+      if (!(event.key in positions)) return;
+      scroller.scrollLeft = positions[event.key];
+      event.preventDefault();
+      updateHeatmapScrollState(scroller);
+    });
+    if (typeof ResizeObserver === "function") {
+      const observer = new ResizeObserver(() => updateHeatmapScrollState(scroller));
+      observer.observe(scroller);
+      const table = scroller.querySelector(".heatmap-table");
+      if (table) observer.observe(table);
+    }
+    updateHeatmapScrollState(scroller);
+  }
+
   function renderHeatmap(attempts) {
     const points = getHeatmapPoints();
     const rows = AAProgressEngine.heatmapRows(attempts, points);
+    currentHeatmapModel = { points, rows };
     if (!rows.length || !points.length) {
-      AA_UI.byId("heatmap").innerHTML = '<p class="muted">No heatmap data yet.</p>';
+      AA_UI.byId("heatmap").innerHTML = `
+        <div class="dashboard-empty-state" role="status">
+          <strong>No heatmap data yet</strong>
+          <span>Adjust the filters or wait for students to complete practice questions.</span>
+        </div>
+      `;
+      setHeatmapExportAvailability(false);
       return;
     }
     AA_UI.byId("heatmap").innerHTML = `
-      <div class="heatmap-grid" style="--columns:${points.length + 1}">
-        <div class="heatmap-heading">Student</div>
-        ${points.map((point) => `<div class="heatmap-heading" title="${AA_UI.escapeHtml(point.label)}">${AA_UI.escapeHtml(point.id.replace("AA-", ""))}</div>`).join("")}
-        ${rows.map((row) => `
-          <div class="heatmap-student">${AA_UI.escapeHtml(row.nickname)}</div>
-          ${row.cells.map((cell) => `
-            <div class="heatmap-cell ${AA_UI.masteryClass(cell.masteryScore)}" title="${AA_UI.escapeHtml(cell.label)}: ${cell.attempts} attempts">
-              ${cell.attempts ? AA_UI.formatPercent(cell.accuracy) : "-"}
-            </div>
-          `).join("")}
-        `).join("")}
+      <div class="heatmap-scroll-shell">
+        <p id="heatmapScrollCue" class="heatmap-scroll-cue" hidden>
+          Scroll horizontally to view all syllabus points <span aria-hidden="true">→</span>
+        </p>
+        <div class="heatmap-scroll-container" tabindex="0" role="region" aria-labelledby="heatmapTitle" aria-describedby="heatmapScrollCue">
+          <table class="heatmap-table">
+            <caption class="visually-hidden">Student accuracy by syllabus point for the active dashboard filters</caption>
+            <thead>
+              <tr>
+                <th class="heatmap-student-heading" scope="col">Student</th>
+                ${points.map((point) => `
+                  <th class="heatmap-column-heading" scope="col" title="${AA_UI.escapeHtml(point.label)}">
+                    ${AA_UI.escapeHtml(point.id.replace("AA-", ""))}
+                  </th>
+                `).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row) => `
+                <tr>
+                  <th class="heatmap-student-name" scope="row">${AA_UI.escapeHtml(row.nickname)}</th>
+                  ${row.cells.map((cell) => `
+                    <td class="heatmap-value-cell ${heatmapAccuracyClass(cell)}" title="${AA_UI.escapeHtml(heatmapCellTitle(row.nickname, cell))}" data-syllabus-id="${AA_UI.escapeHtml(cell.syllabusId)}">
+                      ${cell.attempts ? `<span>${AA_UI.formatPercent(cell.accuracy)}</span>` : '<span class="visually-hidden">No attempts</span>'}
+                    </td>
+                  `).join("")}
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
       </div>
     `;
+    setHeatmapExportAvailability(true);
+    bindHeatmapScrolling(AA_UI.byId("heatmap").querySelector(".heatmap-scroll-container"));
+  }
+
+  function localDateStamp(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function downloadHeatmapCSV() {
+    if (!currentHeatmapModel.rows.length || !currentHeatmapModel.points.length) {
+      setHeatmapExportAvailability(false);
+      return;
+    }
+    const rawClassCode = filters.classCode || "all-classes";
+    const safeClassCode = rawClassCode.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "") || "all-classes";
+    const filename = `student-syllabus-heatmap-${safeClassCode}-${localDateStamp()}.csv`;
+    AA_UI.downloadText(filename, AAProgressEngine.heatmapCSV(currentHeatmapModel), "text/csv;charset=utf-8");
+    const status = AA_UI.byId("heatmapExportStatus");
+    if (status) status.textContent = `Downloaded ${currentHeatmapModel.rows.length} student row${currentHeatmapModel.rows.length === 1 ? "" : "s"} across ${currentHeatmapModel.points.length} syllabus columns.`;
   }
 
   function renderStatList(rows, emptyText) {
@@ -627,6 +752,14 @@
     else await AAStorage.clearAllData();
     await loadTeacherClassesAndRefresh({ force: true, selectedClassCode: classCode });
   }
+
+  window.AATeacherHeatmap = {
+    buildCSV: (model) => AAProgressEngine.heatmapCSV(model || currentHeatmapModel),
+    getCurrentModel: () => ({
+      points: [...currentHeatmapModel.points],
+      rows: currentHeatmapModel.rows.map((row) => ({ ...row, cells: row.cells.map((cell) => ({ ...cell })) }))
+    })
+  };
 
   if (window.AAApp?.ready) {
     window.AAApp.ready(init);
